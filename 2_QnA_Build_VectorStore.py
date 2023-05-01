@@ -164,6 +164,13 @@ print('The index includes: {} documents'.format(docsource._collection.count()))
 # MAGIC Note that the llm_model funciton doesn't clean up after itself. so if you call it repeatedly it will fill up the VRAM
 # MAGIC
 # MAGIC We will add some code to quickly stop reinitiating
+# MAGIC In order to understand the HuggingFace Pipeline we need to look at: 
+# MAGIC - https://huggingface.co/docs/transformers/main_classes/pipelines
+# MAGIC The task set for this pipe is text-generation the def of this is:
+# MAGIC - https://huggingface.co/docs/transformers/main_classes/pipelines#transformers.TextGenerationPipeline
+# MAGIC Device needs to be set in order to utilise GPU
+# MAGIC - See: https://huggingface.co/transformers/v3.0.2/main_classes/pipelines.html#transformers.Pipeline
+
 
 # COMMAND ----------
 
@@ -185,7 +192,7 @@ except NameError:
   tokenizer = AutoTokenizer.from_pretrained(model_id)
   model = AutoModelForCausalLM.from_pretrained(model_id)
   pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048
+        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048, device=0
         )
 
   llm_model = HuggingFacePipeline(pipeline=pipe)
