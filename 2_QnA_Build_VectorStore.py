@@ -25,6 +25,7 @@ from langchain import HuggingFacePipeline
 from langchain.chains import RetrievalQA
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torch
 
 # COMMAND ----------
 
@@ -190,9 +191,12 @@ except NameError:
 
   model_id = "databricks/dolly-v2-3b"
   tokenizer = AutoTokenizer.from_pretrained(model_id)
-  model = AutoModelForCausalLM.from_pretrained(model_id)
+  model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto',
+                                               torch_dtype=torch.bfloat16)
+
   pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048, device=0
+        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048, 
+        device=0
         )
 
   llm_model = HuggingFacePipeline(pipeline=pipe)
@@ -203,7 +207,8 @@ else:
 # COMMAND ----------
 
 # Broken at the moment
-qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", retriever=docsource.as_retriever(search_kwargs={"k": 2}))
+qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
+                                 retriever=docsource.as_retriever(search_kwargs={"k": 1}))
 
 # COMMAND ----------
 
