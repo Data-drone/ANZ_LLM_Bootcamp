@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install fastapi==0.95.2 gradio==3.20.1 uvicorn
+# MAGIC %pip install fastapi==0.95.2 gradio==3.20.1 uvicorn pypdf faiss-cpu
 
 # COMMAND ----------
 # MAGIC %md
@@ -54,5 +54,20 @@ os.environ['OPENAI_API_BASE']="https://dbdemos-open-ai.openai.azure.com/"
 
 # COMMAND ----------
 
+# the advanced app uses certain folder paths
+# hardcoded for now
+vector_store_path = '/tmp/doc_app/vector_store'
+upload_file_path = '/tmp/doc_app/source_documents'
+
+dbutils.fs.mkdirs(vector_store_path)
+dbutils.fs.mkdirs(upload_file_path)
+
+os.environ['VECTOR_STORE_PATH'] = f'/dbfs{vector_store_path}'
+os.environ['UPLOAD_FILE_PATH'] = f'/dbfs{upload_file_path}'
+
+# COMMAND ----------
+
 # DBTITLE 1,Chat to docs application
-# 
+
+# uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
+#!uvicorn advanced_app:app --host 0.0.0.0 --port $DB_APP_PORT
