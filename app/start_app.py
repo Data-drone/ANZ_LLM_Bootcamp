@@ -2,6 +2,14 @@
 # MAGIC %pip install fastapi==0.95.2 gradio==3.20.1 uvicorn
 
 # COMMAND ----------
+# MAGIC %md
+# MAGIC # Starting a Gradio Application
+
+# MAGIC These apps are basic examples only.
+# MAGIC 
+# MAGIC For more information on the framework see: https://gradio.app/docs/
+
+# COMMAND ----------
 import os
 
 # COMMAND ----------
@@ -18,8 +26,33 @@ proxy_prefix = f'dbc-dp-{org_id}.cloud.databricks.com'
 endpoint_url = f"https://{proxy_prefix}/driver-proxy/o/{org_id}/{cluster_id}/{app_port}/"
 print(f"Access this API at {endpoint_url}")
 
-# COMMAND ----------
-
-!uvicorn basic_app:app --host 0.0.0.0 --port $DB_APP_PORT
 
 # COMMAND ----------
+
+# DBTITLE 1,Basic Application
+
+# uncomment the latter for a basic app
+#!uvicorn basic_app:app --host 0.0.0.0 --port $DB_APP_PORT
+
+# COMMAND ----------
+
+# uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
+# the key will be retrieved through db secrets
+os.environ['OPENAI_API_KEY'] = dbutils.secrets.get(scope='brian_dl', key='brian_openai_deployment')
+os.environ['OPENAI_API_TYPE']='azure'
+os.environ['OPENAI_API_VERSION']="2022-12-01"
+
+# your endpoint address will differ
+os.environ['OPENAI_API_BASE']="https://dbdemos-open-ai.openai.azure.com/"
+
+# COMMAND ----------
+
+# DBTITLE 1,Chat Application
+
+# uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
+#!uvicorn chat_app:app --host 0.0.0.0 --port $DB_APP_PORT
+
+# COMMAND ----------
+
+# DBTITLE 1,Chat to docs application
+# 
