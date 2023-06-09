@@ -4,6 +4,7 @@ import gradio as gr
 from doc_chatbot import DocChatBot
 import os
 import shutil
+import fnmatch
 
 block_css = """.importantButton {
     background: linear-gradient(45deg, #7e0570,#5d1c99, #6e00ff) !important;

@@ -71,3 +71,16 @@ os.environ['UPLOAD_FILE_PATH'] = f'/dbfs{upload_file_path}'
 
 # uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
 #!uvicorn advanced_app:app --host 0.0.0.0 --port $DB_APP_PORT
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Using self hosted open source models
+
+# COMMAND ----------
+
+# DBTITLE 1,Chat to dolly
+
+# uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
+#!uvicorn oss_chat_app:app --host 0.0.0.0 --port $DB_APP_PORT
+
