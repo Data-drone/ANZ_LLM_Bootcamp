@@ -11,6 +11,18 @@ import os
 import torch
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import StoppingCriteria, StoppingCriteriaList
+
+
+class StopOnTokens(StoppingCriteria):
+  def __init__(self, stop_token_ids):
+     self.stop_token_ids = stop_token_ids
+
+  def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+    for stop_id in self.stop_token_ids:
+        if input_ids[0][-1] == stop_id:
+            return True
+    return False
 
 def load_chain():
     """Logic for loading the chain you want to use should go here."""
@@ -19,14 +31,22 @@ def load_chain():
     # openai.api_version = os.getenv("OPENAI_API_VERSION")
     # openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    model_id = "databricks/dolly-v2-3b"
+    # dolly works but isn't the best model
+    #model_id = "databricks/dolly-v2-3b"
+    model_id = "mosaicml/mpt-7b-chat"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+    stop_token_ids = tokenizer.convert_tokens_to_ids(["<|endoftext|>"])
+
+    stopping_criteria = StoppingCriteriaList([StopOnTokens(stop_token_ids)])
+
     model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto',
-                                               torch_dtype=torch.bfloat16)
+                                               torch_dtype=torch.bfloat16,
+                                               trust_remote_code=True)
 
     pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048, 
-        device=0
+        "text-generation", model=model, tokenizer=tokenizer, max_length = 4096,
+        stopping_criteria=stopping_criteria, repetition_penalty=1.1
         )
 
     llm = HuggingFacePipeline(pipeline=pipe)

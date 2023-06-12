@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install fastapi==0.95.2 gradio==3.20.1 uvicorn pypdf faiss-cpu
+# MAGIC %pip install fastapi==0.95.2 gradio==3.20.1 uvicorn pypdf faiss-cpu einops
 
 # COMMAND ----------
 # MAGIC %md
@@ -79,7 +79,7 @@ os.environ['UPLOAD_FILE_PATH'] = f'/dbfs{upload_file_path}'
 
 # COMMAND ----------
 
-# DBTITLE 1,Chat to dolly
+# DBTITLE 1,Chat to MPT-7B model
 
 # uncomment the latter to try out the basic chatbot note you will need to supply your own subscription endpoint
 #!uvicorn oss_chat_app:app --host 0.0.0.0 --port $DB_APP_PORT
