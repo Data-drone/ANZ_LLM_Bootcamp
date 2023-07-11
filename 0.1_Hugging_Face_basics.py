@@ -16,6 +16,10 @@
 # MAGIC *Notes*
 # MAGIC Falcon requires Torch 2.0 coming soon....
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setup
 
 # COMMAND ----------
 
@@ -38,7 +42,12 @@ import os
 
 # COMMAND ----------
 
-# Setup
+# MAGIC %md
+# MAGIC ### Setup Env
+# MAGIC Configure databricks storage locations and caching
+# MAGIC By default databricks uses dbfs to store information. Huggingface will by default cache to a root path folder.\
+# MAGIC We can change that to make things easier
+# COMMAND ----------
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -75,13 +84,16 @@ mpt_config = AutoConfig.from_pretrained(model_id,
                                           init_device='meta'
                                       )
 
-mpt_config.save_pretrained(save_directory=dbfs_tmp_dir,
-                           config_file_name='mpt_config.json')
+# we can save out and examine the config through this call
+## Remember all models from HuggingFace are Open Source 
+## sometimes the default configs have issues and we need to override them by writing it out
+## and manually changing values in the json
+mpt_config.save_pretrained(save_directory=dbfs_tmp_dir)
 
 # COMMAND ----------
 
 # MAGIC %sh
-# MAGIC cat $PROJ_TMP_DIR/mpt_config.json
+# MAGIC ls $PROJ_TMP_DIR/
 
 # COMMAND ----------
 
@@ -140,8 +152,78 @@ print(output[0]['generated_text'])
 
 # COMMAND ----------
 
-
 # MAGIC %md 
-# MAGIC Experimenting with open-llama
+# MAGIC # Logging with MLflow
+# MAGIC We will now integate MLflow and show you how you can use it to log sample prompts and responses.\
+# MAGIC 
 
 # COMMAND ----------
+import mlflow
+
+mlflow_dir = f'/Users/{username}/huggingface_samples'
+mlflow.set_experiment(mlflow_dir)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setting up prompts / inputs and logging outputs
+# MAGIC Mlflow logging is structured as prompts, inputs and outputs\
+# MAGIC For full description see: https://mlflow.org/docs/latest/llm-tracking.html
+
+# COMMAND ----------
+
+# DBTITLE 1,Setup Configs
+user_inputs = ["How can I make a coffee?",
+          "How can I book a restaurant?",
+          "How can I make idle chit chat when I don't know a person?"]
+
+# COMMAND ----------
+
+with mlflow.start_run(run_name='mpt model'):
+    
+  for user_input in user_inputs:
+    prompt = f"""
+            You are an AI assistant that helps people find information and responds in rhyme. 
+            If the user asks you a question you don't know the answer to, say so.
+
+            {user_input}
+            """
+
+    raw_output = pipe(prompt, max_length=200, repetition_penalty=1.2)
+    text_output = raw_output[0]['generated_text']
+
+    mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
+
+# COMMAND ----------
+
+# Setup Open Llama instead
+# See: https://huggingface.co/openlm-research/open_llama_7b_v2_easylm
+
+from transformers import LlamaTokenizer, LlamaForCausalLM
+
+## v2 models
+model_path = 'openlm-research/open_llama_7b_v2'
+
+tokenizer = LlamaTokenizer.from_pretrained(model_path)
+model = LlamaForCausalLM.from_pretrained(
+    model_path, torch_dtype=torch.bfloat16, device_map='auto',
+)
+
+pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer 
+        )
+
+with mlflow.start_run(run_name='open-llama model'):
+    
+  for user_input in user_inputs:
+    prompt = f"""
+            You are an AI assistant that helps people find information and responds in rhyme. 
+            If the user asks you a question you don't know the answer to, say so.
+
+            {user_input}
+            """
+
+    raw_output = pipe(prompt, max_length=200, repetition_penalty=1.2)
+    text_output = raw_output[0]['generated_text']
+
+    mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
