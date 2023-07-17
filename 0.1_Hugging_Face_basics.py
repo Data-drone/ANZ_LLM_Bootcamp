@@ -34,10 +34,6 @@
 # COMMAND ----------
 
 # DBTITLE 1,Load Libs
-
-# Manual Model building
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
-import torch
 import os
 
 # COMMAND ----------
@@ -47,6 +43,7 @@ import os
 # MAGIC Configure databricks storage locations and caching
 # MAGIC By default databricks uses dbfs to store information. Huggingface will by default cache to a root path folder.\
 # MAGIC We can change that to make things easier
+# MAGIC _NOTE_ we need to set the cache before loading the lib
 # COMMAND ----------
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
@@ -56,6 +53,18 @@ tmp_user_folder = f'/tmp/{username}'
 dbutils.fs.mkdirs(tmp_user_folder)
 dbfs_tmp_dir = f'/dbfs{tmp_user_folder}'
 os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
+
+# setting up transformers cache
+cache_dir = f'{tmp_user_folder}/.cache'
+dbutils.fs.mkdirs(cache_dir)
+dbfs_tmp_cache = f'/dbfs{cache_dir}'
+os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
+
+# COMMAND ----------
+
+# Manual Model building
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
+import torch
 
 # COMMAND ----------
 
@@ -74,7 +83,7 @@ os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
 
 model_id = 'mosaicml/mpt-7b'
 model_revision = '72e5f594ce36f9cabfa2a9fd8f58b491eb467ee7'
-tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
 
 # lets move to the config version
 # using max_length here is deprecating max_length=4096
@@ -105,7 +114,8 @@ model = AutoModelForCausalLM.from_pretrained(model_id,
                                                trust_remote_code=True, # needed on both sides
                                                config=mpt_config,
                                                device_map='auto',
-                                               torch_dtype=torch.bfloat16 # This will only work A10G / A100 and newer GPUs
+                                               torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
+                                               cache_dir=dbfs_tmp_cache
                                               )
 
 # COMMAND ----------
@@ -120,6 +130,7 @@ model = AutoModelForCausalLM.from_pretrained(model_id,
 # MAGIC - temperature
 # MAGIC - eos_token_id
 # MAGIC - pad_token_id
+# MAGIC - repartition_penalty
 
 # COMMAND ----------
 
@@ -140,14 +151,15 @@ pipe = pipeline(
 
 # COMMAND ----------
 
-# We seem to need to set the max length here for mpt model
-output = pipe("How are you?", max_length=200, repetition_penalty=1.2)
+# Max new tokens constrains the length of our text
+# 
+output = pipe("How are you?", max_new_tokens=20)
 print(output[0]['generated_text'])
 
 # COMMAND ----------
 
-# We seem to need to set the max length here for mpt model
-output = pipe("Give me a list in dot points of 10 types of cookies?", max_length=200, repetition_penalty=1.2)
+# repetition_penalty affects whether we get repeats or not
+output = pipe("How are you?", max_new_tokens=20, repetition_penalty=1.2)
 print(output[0]['generated_text'])
 
 # COMMAND ----------
@@ -213,17 +225,24 @@ pipe = pipeline(
         "text-generation", model=model, tokenizer=tokenizer 
         )
 
+user_input = user_inputs[0]
+
 with mlflow.start_run(run_name='open-llama model'):
     
   for user_input in user_inputs:
     prompt = f"""
-            You are an AI assistant that helps people find information and responds in rhyme. 
-            If the user asks you a question you don't know the answer to, say so.
-
-            {user_input}
-            """
-
+        You are an AI assistant that helps people find information and responds in rhyme. 
+        If the user asks you a question you don't know the answer to, say so.
+        {user_input}
+        """
     raw_output = pipe(prompt, max_length=200, repetition_penalty=1.2)
     text_output = raw_output[0]['generated_text']
+    mlflow.llm.log_predictions(inputs=[user_input], outputs=[text_output], prompts=[prompt])
 
-    mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
+# COMMAND ----------
+
+# Testing mlflow evaluate
+
+
+
+# COMMAND ----------
