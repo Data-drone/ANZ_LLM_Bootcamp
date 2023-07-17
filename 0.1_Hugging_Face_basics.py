@@ -1,49 +1,42 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Supplementary Exercises on HuggingFace
-# MAGIC Huggingface provides a series of livraries that are critical in the OSS llm space\
+# MAGIC # Supplementary Examples on HuggingFace
+# MAGIC Huggingface🤗 provides a series of libraries that are critical in the OSS llm space\
 # MAGIC To use them properly later on and debug issues we need to have an understand of how they work\
-# MAGIC This is not a full tutorial. See HuggingFace docs for that. But it will function as a crash course
+# MAGIC This is not a full tutorial. See HuggingFace docs for that. But it will function as a crash course.
 # MAGIC
-# MAGIC In these exercises we will focus on the _transformers_ library but _datasets_, _evaluate_ and _accelerate_ are commonly used in training models
-# MAGIC
-# MAGIC *NOTE* The LLM Space is fast moving. Many models are provided by independent companies as well so code version is important
+# MAGIC In these exercises we will focus on the _transformers_ library but _datasets_, _evaluate_ and _accelerate_ are commonly used in training models. 
 # MAGIC
 # MAGIC All code here is tested on MLR 13.2 on a g5 AWS instance (A10G GPU).
-# MAGIC We suggest a g5.4xlarge single node cluster to start
-# MAGIC The Azure equivalent is XXXX
-
-# MAGIC *Notes*
-# MAGIC Falcon requires Torch 2.0 coming soon....
+# MAGIC We suggest a ```g5.4xlarge``` single node cluster to start
+# MAGIC The Azure equivalent is ```NC6s_v3``` series. However, for this lab we will be using ```g5.4xlarge``` instances.
+# MAGIC ----
+# MAGIC **Notes**
+# MAGIC - Falcon requires Torch 2.0 coming soon....
+# MAGIC - The LLM Space is fast moving. Many models are provided by independent companies as well so code version is important.
+# MAGIC - If using an MLR prior to 13.2, you will need to run ```%pip install einops```
+# MAGIC - Sometimes needed to fix loading (```%pip install xformers```)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Setup
-
-# COMMAND ----------
-
-# DBTITLE 1,Needed prior to 13.2
-#%pip install einops
-
-# COMMAND ----------
-
-# Sometimes needed to fix loading
-#%pip install xformers
+# MAGIC ## Setup 🚀
 
 # COMMAND ----------
 
 # DBTITLE 1,Load Libs
 import os
 
+# Manual Model building
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
+import torch
+
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ### Setup Env
-# MAGIC Configure databricks storage locations and caching
-# MAGIC By default databricks uses dbfs to store information. Huggingface will by default cache to a root path folder.\
-# MAGIC We can change that to make things easier
-# MAGIC _NOTE_ we need to set the cache before loading the lib
+# MAGIC Configure databricks storage locations and caching. By default databricks uses dbfs to store information. HuggingFace will by default cache to a root path folder. We can change that to make things easier.
+
 # COMMAND ----------
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
@@ -71,11 +64,20 @@ import torch
 # MAGIC %md
 # MAGIC ## Understanding pipelines
 # MAGIC
-# MAGIC Language Pipelines contain two key components the tokenizer and the LLM model itself.
-# MAGIC The tokenizer component converts integers into 
-
+# MAGIC Once you decide which task you want to takle, language Pipelines contain two key components: the tokenizer and the LLM model itself.
+# MAGIC
+# MAGIC - [Tokenizers](https://huggingface.co/docs/transformers/main_classes/tokenizer) in HuggingFace🤗, the tokenizers are responsible for preparing text for input to transformer models. More technically, they are responsible for taking text and mapping them to a vector representation in integers (which can be interpretted by our models). We will explore this now...
+# MAGIC
+# MAGIC - [Models](https://huggingface.co/models) are pretrained versions of various transformer architectures that are used for different natural language processing tasks. They are encapsulations of complex neural networks, each with pre-trained weights that can either be used directly for inference or further fine-tuned on specific tasks. Each 
+# MAGIC
+# MAGIC
 # MAGIC ### Loading the model
-# MAGIC 
+# MAGIC We will use the MPT-7B model's tokenizer. We encourage checking out the [model card](https://huggingface.co/mosaicml/mpt-7b) for further information. 
+# MAGIC
+# MAGIC -----
+# MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note"> Different models require different tokenizers due to variations in their pretraining objectives, architectures, and specific token handling needs. These models may be trained on different vocabularies or employ unique tokenization techniques such as Byte Pair Encoding or SentencePiece. Essentially, each tokenizer transforms text into a format that aligns with the training environment of its corresponding model.
+# MAGIC
+# MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note"> It is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of mpt-7b in https://huggingface.co/mosaicml/mpt-7b/commits/main
 
 # COMMAND ----------
 
@@ -106,9 +108,14 @@ mpt_config.save_pretrained(save_directory=dbfs_tmp_dir)
 
 # COMMAND ----------
 
-# revision is important to ensure same behaviour
-# device_map moves it to gpu
-# torch.bfloat16 helps save memory by halving numeric precision
+# MAGIC %md
+# MAGIC Could of notes: 
+# MAGIC - Revision is important to ensure same behaviour
+# MAGIC - ```device_map``` moves it to gpu
+# MAGIC - ```torch.bfloat16``` helps save memory by halving numeric precision
+
+# COMMAND ----------
+
 model = AutoModelForCausalLM.from_pretrained(model_id,
                                                revision=model_revision,
                                                trust_remote_code=True, # needed on both sides
@@ -125,17 +132,18 @@ model = AutoModelForCausalLM.from_pretrained(model_id,
 # MAGIC
 # MAGIC The pipeline connects the tokenizer to the model entity itself.
 # MAGIC
-# MAGIC Key Parameters:
-# MAGIC - max_new_tokens
-# MAGIC - temperature
-# MAGIC - eos_token_id
-# MAGIC - pad_token_id
-# MAGIC - repartition_penalty
+# MAGIC **Key Parameters**
+# MAGIC
+# MAGIC 1. **max_new_tokens**: Defines the maximum number of tokens produced during text generation. Useful for controlling the length of the output.
+# MAGIC 2. **temperature**: Adjusts the randomness in the model's output. Lower values yield more deterministic results, higher values introduce more diversity.
+# MAGIC 3. **eos_token_id**: Token ID that signifies the end of a sentence or sequence. The model stops generating tokens once it generates this token.
+# MAGIC 4. **pad_token_id**: Used to equalize the length of multiple sequences by adding 'pad' tokens. For models that pay attention to padding (like BERT), these tokens are ignored.
+# MAGIC
 
 # COMMAND ----------
 
 mpt_generation_config = GenerationConfig(
-    max_new_tokens=1024,
+    max_new_tokens = 1024,
     temperature = 0.1,
     top_p = 0.92,
     top_k = 0, 
@@ -151,9 +159,12 @@ pipe = pipeline(
 
 # COMMAND ----------
 
-# Max new tokens constrains the length of our text
-# 
-output = pipe("How are you?", max_new_tokens=20)
+# MAGIC %md <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note"> In the code below, we reference the ```repetition_penalty```. Is a parameter to penalise the model for repetition. ```1.0``` implies no penalty. This penalty is applied during the sampling phase by discounting the scores of previously generated tokens. In a greedy sampling scheme, this incentivies model exploration. Please see this paper for further details [https://arxiv.org/pdf/1909.05858.pdf](https://arxiv.org/pdf/1909.05858.pdf).
+
+# COMMAND ----------
+
+# We seem to need to set the max length here for mpt model
+output = pipe("How are you?", max_new_tokens=200, repetition_penalty=1.2)
 print(output[0]['generated_text'])
 
 # COMMAND ----------
@@ -167,9 +178,10 @@ print(output[0]['generated_text'])
 # MAGIC %md 
 # MAGIC # Logging with MLflow
 # MAGIC We will now integate MLflow and show you how you can use it to log sample prompts and responses.\
-# MAGIC 
+# MAGIC
 
 # COMMAND ----------
+
 import mlflow
 
 mlflow_dir = f'/Users/{username}/huggingface_samples'
@@ -185,9 +197,13 @@ mlflow.set_experiment(mlflow_dir)
 # COMMAND ----------
 
 # DBTITLE 1,Setup Configs
-user_inputs = ["How can I make a coffee?",
-          "How can I book a restaurant?",
-          "How can I make idle chit chat when I don't know a person?"]
+user_inputs = [
+  "How can I make a coffee?",
+  "How can I book a restaurant?",
+  "How can I make idle chit chat when I don't know a person?"
+]
+prompts = []
+model_outputs = []
 
 # COMMAND ----------
 
@@ -208,8 +224,11 @@ with mlflow.start_run(run_name='mpt model'):
 
 # COMMAND ----------
 
-# Setup Open Llama instead
-# See: https://huggingface.co/openlm-research/open_llama_7b_v2_easylm
+# MAGIC %md
+# MAGIC - Setup Open Llama instead
+# MAGIC - See: https://huggingface.co/openlm-research/open_llama_7b_v2_easylm
+
+# COMMAND ----------
 
 from transformers import LlamaTokenizer, LlamaForCausalLM
 
