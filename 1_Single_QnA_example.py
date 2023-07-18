@@ -118,7 +118,8 @@ texts[1]
 
 # COMMAND ----------
 
-embeddings = HuggingFaceEmbeddings()
+embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
+                                   model_kwargs={'device': 'cpu'})
 docsearch = Chroma.from_documents(texts, embeddings)
 
 # we can verify that our docsearch index has objects in it with this
@@ -189,7 +190,7 @@ print(scores)
 
 # COMMAND ----------
 
-%sh wget -P /local_disk0/  https://huggingface.co/TheBloke/MPT-7B-Instruct-GGML/resolve/main/mpt-7b-instruct.ggmlv3.q5_0.bin
+%sh wget -P /local_disk0/ -N  https://huggingface.co/TheBloke/MPT-7B-Instruct-GGML/resolve/main/mpt-7b-instruct.ggmlv3.q5_0.bin
 # COMMAND ----------
 
 ## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
