@@ -7,11 +7,20 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Install ctransformers for CPU inference
+%pip install ctransformers==0.2.13
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 run_mode = 'cpu' # or gpu
 # COMMAND ----------
 
 # DBTITLE 1,Setup
-%run utils
+%run ./utils
 
 # COMMAND ----------
 
@@ -264,7 +273,6 @@ str_output
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC **NOTE** TODO move out
 # MAGIC # Managing Prompts w MLFlow
 # MAGIC As we can see logging prompts can be hard!\
 # MAGIC You might have already ended up with spreadsheets of prompts and replies!\
@@ -292,10 +300,6 @@ user_inputs = [
 ]
 prompts = []
 model_outputs = []
-
-# COMMAND ----------
-
-
 
 # COMMAND ----------
 

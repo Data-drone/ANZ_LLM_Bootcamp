@@ -31,7 +31,7 @@ os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
 
 # COMMAND ----------
 
-def load_model(run_mode: str, dbfs_cache_dir; str):
+def load_model(run_mode: str, dbfs_cache_dir: str):
     """
     run_mode (str) - can be gpu or cpu
     """

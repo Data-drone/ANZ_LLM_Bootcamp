@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install langchain pypdf sentence_transformers chromadb ctransformers
+# MAGIC %pip install pypdf sentence_transformers chromadb ctransformers
 
 # COMMAND ----------
 
@@ -52,6 +52,8 @@ from transformers import pipeline
 # MAGIC
 
 # COMMAND ----------
+%run ./utils
+# COMMAND ----------
 
 # Setup and config variables
 ## We will store data in a local folder for now
@@ -62,7 +64,7 @@ username
 # To learn how to set secrets
 # We need to set this to pull from huggingface hub - You can get a token here
 # https://huggingface.co/docs/hub/security-tokens
-os.environ['HUGGINGFACEHUB_API_TOKEN'] =  "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"
+# os.environ['HUGGINGFACEHUB_API_TOKEN'] =  "<token_if_needed>"
 
 data_folder = f'/dbfs/home/{username}/pdf_data'
 file_to_load = data_folder + '/2109.07306.pdf'
@@ -190,9 +192,6 @@ print(scores)
 
 # COMMAND ----------
 
-%sh wget -P /local_disk0/ -N  https://huggingface.co/TheBloke/MPT-7B-Instruct-GGML/resolve/main/mpt-7b-instruct.ggmlv3.q5_0.bin
-# COMMAND ----------
-
 ## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
 # The only way to clear GPU ram is to detach and reattach
 
@@ -213,26 +212,15 @@ except NameError:
 
   # For the config we can see: https://huggingface.co/docs/transformers/main_classes/text_generation#transformers.GenerationConfig
 
-  if run_mode == 'cpu':
+  # TODO fix the task shenanigans
+  #from ctransformers.langchain import CTransformers
 
-    from ctransformers.langchain import CTransformers
-    model_id = "/local_disk0/mpt-7b-instruct.ggmlv3.q5_0.bin"
-    llm = CTransformers(model=model_id, 
-                    model_type='mpt')
-    #pipe = AutoModelForCausalLM.from_pretrained(model_id, model_type='gpt2', lib='avx')
-    llm_model = HuggingFacePipeline(pipeline=llm)
+  #pipe = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
+  #llm_model = HuggingFacePipeline(pipeline=pipe)
 
-  elif run_mode == 'gpu':
+  pipe = load_model(run_mode, dbfs_tmp_cache)
 
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    model_id = "databricks/dolly-v2-3b"
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(model_id)
-    pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048
-        )
-
-    llm_model = HuggingFacePipeline(pipeline=pipe)
+  llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass
