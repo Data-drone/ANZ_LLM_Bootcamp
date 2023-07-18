@@ -6,80 +6,28 @@
 # MAGIC For more details see: https://www.promptingguide.ai/
 
 # COMMAND ----------
-import os
 
-username = spark.sql("SELECT current_user()").first()['current_user()']
-os.environ['USERNAME'] = username
+run_mode = 'cpu' # or gpu
+# COMMAND ----------
 
-tmp_user_folder = f'/tmp/{username}'
-dbutils.fs.mkdirs(tmp_user_folder)
-dbfs_tmp_dir = f'/dbfs{tmp_user_folder}'
-os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
-
-# setting up transformers cache
-cache_dir = f'{tmp_user_folder}/.cache'
-dbutils.fs.mkdirs(cache_dir)
-dbfs_tmp_cache = f'/dbfs{cache_dir}'
-os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
+# DBTITLE 1,Setup
+%run utils
 
 # COMMAND ----------
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
-import torch
-
-from transformers import LlamaTokenizer, LlamaForCausalLM
-
-
+pipe = load_model(run_mode, dbfs_tmp_cache)
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC # Building out prompts
-# MAGIC We first need to make up some questions to play around with
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Loading Model
-# MAGIC chat models are base models that have been finetuned on conversations
-
-# COMMAND ----------
-
-model_id = 'mosaicml/mpt-7b-chat'
-model_revision = 'c53dee01e05098f81cac11145f9bf45feedc5b2f'
-tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
-
-mpt_config = AutoConfig.from_pretrained(model_id,
-                                          trust_remote_code=True, # needed on both sides
-                                          revision=model_revision,
-                                          init_device='meta'
-                                      )
-
-model = AutoModelForCausalLM.from_pretrained(model_id,
-                                               revision=model_revision,
-                                               trust_remote_code=True, # needed on both sides
-                                               config=mpt_config,
-                                               device_map='auto',
-                                               torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
-                                               cache_dir=dbfs_tmp_cache
-                                              )
-
-pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer 
-        )
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC # Basic Prompts
 # MAGIC Getting started is easy, we can send text in.
-# MAGIC It is worth noting that different models will respond differently\
-# MAGIC On huggingface it is common to see a model, MPT, have several variants\
-# MAGIC - base
-# MAGIC - instruct
-# MAGIC - chat
+# MAGIC Remember that different models will respond differently\
 # COMMAND ----------
-
-
 
 # MAGIC %md
 # MAGIC # Basic Prompting
@@ -88,31 +36,33 @@ pipe = pipeline(
 # COMMAND ----------
 
 prompt = "The sky is"
-
-print(pipe(prompt)[0]['generated_text'])
-
-# COMMAND ----------
-
-prompt = "The sky is"
-
-print(pipe(prompt, max_new_tokens=40)[0]['generated_text'])
-
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 # COMMAND ----------
 
 prompt = "The red sky is"
-
-print(pipe(prompt)[0]['generated_text'])
-
-# COMMAND ----------
-
-print(pipe("Knock Kock")[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
-prompt = "Knock Kock\
-     Who's there"
+prompt = "Knock Knock"
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
-print(pipe(prompt, max_new_tokens=150, repetition_penalty=1.2)[0]['generated_text'])
+# COMMAND ----------
+
+prompt = """
+    Knock Knock
+    Who's there?
+    """
+
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -128,7 +78,9 @@ prompt = """
     Sentiment:
 """
 
-print(pipe(prompt, max_new_tokens=150, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -138,7 +90,9 @@ prompt = """
     Sentiment:
 """
 
-print(pipe(prompt, max_new_tokens=150, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -148,8 +102,9 @@ prompt = """
     Interest Rate:
 """
 
-print(pipe(prompt, max_new_tokens=100, repetition_penalty=1.2)[0]['generated_text'])
-
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -166,7 +121,9 @@ prompt = """
     What account would you recommend a small business?
 """
 
-print(pipe(prompt, max_new_tokens=60, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -178,7 +135,9 @@ prompt = """
     Question: What account would you recommend a consumer?
 """
 
-print(pipe(prompt, max_new_tokens=60, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -196,7 +155,9 @@ prompt = """
     How many apples did I remain with?
 """
 
-print(pipe(prompt, max_new_tokens=60, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 
 # COMMAND ----------
@@ -210,7 +171,9 @@ prompt = """
 
 """
 
-print(pipe(prompt, max_new_tokens=100, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -252,8 +215,9 @@ prompt = f"""
     Think through it step by step:
 """
 
-print(pipe(prompt, max_new_tokens=100, repetition_penalty=1.2)[0]['generated_text'])
-
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 
 # COMMAND ----------
@@ -274,7 +238,9 @@ prompt = """
     What happens to GNNs as you add layers?
 """
 
-print(pipe(prompt, max_new_tokens=100, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
@@ -291,8 +257,60 @@ the number of layers increases.
     Question: {user_question}
 """
 
-print(pipe(prompt, max_new_tokens=200, repetition_penalty=1.2)[0]['generated_text'])
+output = pipe(prompt, max_new_tokens=100)
+str_output = string_printer(output, run_mode)
+str_output
 
 # COMMAND ----------
 
+# MAGIC %md 
+# MAGIC **NOTE** TODO move out
+# MAGIC # Managing Prompts w MLFlow
+# MAGIC As we can see logging prompts can be hard!\
+# MAGIC You might have already ended up with spreadsheets of prompts and replies!\
+# MAGIC Whilst MLflow support for LLMs is still an area of improvement we have made great strides already\
+# MAGIC 
+# MAGIC See: https://www.databricks.com/blog/2023/04/18/introducing-mlflow-23-enhanced-native-llm-support-and-new-features.html
+# MAGIC See: https://www.databricks.com/blog/announcing-mlflow-24-llmops-tools-robust-model-evaluation
+# MAGIC
+# MAGIC We will quickly review the llm tracking API from the 2.3 addition\
+# MAGIC For full descriptions see: https://mlflow.org/docs/latest/llm-tracking.html
+# COMMAND ----------
+
+import mlflow
+
+mlflow_dir = f'/Users/{username}/mlflow_log_hf'
+mlflow.set_experiment(mlflow_dir)
+
+# COMMAND ----------
+
+# DBTITLE 1,Setup Configs
+user_inputs = [
+  "How can I make a coffee?",
+  "How can I book a restaurant?",
+  "How can I make idle chit chat when I don't know a person?"
+]
+prompts = []
+model_outputs = []
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+with mlflow.start_run(run_name='openassist model'):
+    
+  for user_input in user_inputs:
+    prompt = f"""
+            You are an AI assistant that helps people find information and responds in rhyme. 
+            If the user asks you a question you don't know the answer to, say so.
+
+            {user_input}
+            """
+
+    raw_output = pipe(prompt, max_length=200, repetition_penalty=1.2)
+    text_output = string_printer(raw_output, run_mode)
+
+    mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
 
