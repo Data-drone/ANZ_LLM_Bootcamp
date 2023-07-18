@@ -13,10 +13,19 @@
 # MAGIC ----
 # MAGIC **Notes**
 # MAGIC - Falcon requires Torch 2.0 coming soon....
-# MAGIC - The LLM Space is fast moving. Many models are provided by independent companies as well so code version is important.
+# MAGIC - The LLM Space is fast moving. Many models are provided by independent companies as well so model revision and pinning library versions is important.
 # MAGIC - If using an MLR prior to 13.2, you will need to run ```%pip install einops```
-# MAGIC - Sometimes needed to fix loading (```%pip install xformers```)
+# MAGIC - It may also be necessary to manually install extra Nvidia libraries via [init_scripts](https://docs.databricks.com/clusters/init-scripts.html)
+# MAGIC - Sometimes huggingface complains about xformers you can add that install to the below pip command (```%pip install xformers```)
 
+# COMMAND ----------
+
+# DBTITLE 1,Install ctransformers for CPU inference
+%pip install ctransformers==0.2.13
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 # COMMAND ----------
 
 # MAGIC %md
@@ -24,20 +33,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Load Libs
-import os
-
-# Manual Model building
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
-import torch
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ### Setup Env
-# MAGIC Configure databricks storage locations and caching. By default databricks uses dbfs to store information. HuggingFace will by default cache to a root path folder. We can change that to make things easier.
-
+# MAGIC ### DBFS Cache
+# MAGIC Configure databricks storage locations and caching. By default databricks uses dbfs to store information.\ 
+# MAGIC HuggingFace will by default cache to a root path folder. We can change that so that we don't have to redownload if the cluster terminates.
+# MAGIC [dbutils](https://docs.databricks.com/dev-tools/databricks-utils.html) is a databricks utility for working with the object store tier.
 # COMMAND ----------
+import os
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -53,109 +55,105 @@ dbutils.fs.mkdirs(cache_dir)
 dbfs_tmp_cache = f'/dbfs{cache_dir}'
 os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
 
-# COMMAND ----------
-
-# Manual Model building
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig, GenerationConfig
-import torch
+run_mode = 'cpu'
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Understanding pipelines
+# MAGIC ## HuggingFace🤗 Crash Course
 # MAGIC
-# MAGIC Once you decide which task you want to takle, language Pipelines contain two key components: the tokenizer and the LLM model itself.
-# MAGIC
+# MAGIC There are a few key components that we need to construct an llm object that we can converse with.\
 # MAGIC - [Tokenizers](https://huggingface.co/docs/transformers/main_classes/tokenizer) in HuggingFace🤗, the tokenizers are responsible for preparing text for input to transformer models. More technically, they are responsible for taking text and mapping them to a vector representation in integers (which can be interpretted by our models). We will explore this now...
 # MAGIC
 # MAGIC - [Models](https://huggingface.co/models) are pretrained versions of various transformer architectures that are used for different natural language processing tasks. They are encapsulations of complex neural networks, each with pre-trained weights that can either be used directly for inference or further fine-tuned on specific tasks. Each 
 # MAGIC
+# MAGIC Once we have the tokenizer and the model then we can put all into a pipeline\
+# MAGIC Note with Huggingface components each object will have it's own configuration parameters. ie
+# MAGIC - tokenizer configs
+# MAGIC - model configs
+# MAGIC - pipeline configs
 # MAGIC
-# MAGIC ### Loading the model
-# MAGIC We will use the MPT-7B model's tokenizer. We encourage checking out the [model card](https://huggingface.co/mosaicml/mpt-7b) for further information. 
+# MAGIC One known issue is if you run the code that loads a model twice then it will not overwrite GPU memory.\
+# MAGIC It will load the new copy in fresh memory and you can get an `Out of Memory` (OOM) error.\
+# MAGIC The easiest fix is to [Detach & Attach](https://docs.databricks.com/notebooks/notebook-ui.html#detach-a-notebook)
+# MAGIC When loading models, setting the revision can be important to replicate behaviour. See: [HuggingFace🤗 Repository Docs](https://huggingface.co/docs/transformers/model_sharing#repository-features) 
 # MAGIC
-# MAGIC -----
-# MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note"> Different models require different tokenizers due to variations in their pretraining objectives, architectures, and specific token handling needs. These models may be trained on different vocabularies or employ unique tokenization techniques such as Byte Pair Encoding or SentencePiece. Essentially, each tokenizer transforms text into a format that aligns with the training environment of its corresponding model.
+# MAGIC When working with standard model objects then it we can use all the normal APIs.\
+# MAGIC But To make llms fast enough to run on CPU we need to leverage a couple of other opensource components.\
+# MAGIC These are not standard huggingface components so work a bit differently.\
+# MAGIC - [ggml](https://github.com/ggerganov/ggml) Which is a specialised tensor library for fast inference.\ 
+# MAGIC 
+# MAGIC - [ctransformer](https://github.com/marella/ctransformers) A wrapper for ggml to give it a python API 
 # MAGIC
-# MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note"> It is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of mpt-7b in https://huggingface.co/mosaicml/mpt-7b/commits/main
+# MAGIC The CPU version loads differently and we essentially get the model object straight away without having to define the tokenizer.
+# MAGIC
+# MAGIC To ensure that we have consistency between CPU and GPU experiences, we will use the model - open-llama-7B-v2-open-instruct\
+# MAGIC Since this is available in CPU optimized and GPU formats
 
 # COMMAND ----------
 
-# DBTITLE 1,First we setup the model config
+from transformers import AutoTokenizer, pipeline, AutoConfig, GenerationConfig
+import torch
 
-model_id = 'mosaicml/mpt-7b'
-model_revision = '72e5f594ce36f9cabfa2a9fd8f58b491eb467ee7'
-tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
 
-# lets move to the config version
-# using max_length here is deprecating max_length=4096
-mpt_config = AutoConfig.from_pretrained(model_id,
-                                          trust_remote_code=True, # needed on both sides
-                                          revision=model_revision,
-                                          init_device='meta'
+if run_mode == 'cpu':
+
+  ### Note that caching for TheBloke's models don't follow standard HuggingFace routine
+  # You would need to `wget` then weights then use a model_path config instead.
+  # See ctransformers docs for more info
+  from ctransformers import AutoModelForCausalLM
+  model_id = 'TheBloke/open-llama-7B-v2-open-instruct-GGML'
+  pipe = AutoModelForCausalLM.from_pretrained(model_id,
+                                           model_type='llama')
+
+elif run_mode == 'gpu':
+  from transformers import AutoModelForCausalLM
+  model_id = 'VMware/open-llama-7b-v2-open-instruct'
+  model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
+
+  # note when on gpu then this will auto load to gpu
+  # this will take approximately an extra 1GB of VRAM
+  tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
+
+  model_config = AutoConfig.from_pretrained(model_id,
+                                          trust_remote_code=True, # this can be needed if we reload from cache
+                                          revision=model_revision
                                       )
+  
+  # NOTE only A10G support `bfloat16` - g5 instances
+  # V100 machines ie g4 need to use `float16`
+  # device_map = `auto` moves the model to GPU if possible.
+  # Note not all models support `auto`
 
-# we can save out and examine the config through this call
-## Remember all models from HuggingFace are Open Source 
-## sometimes the default configs have issues and we need to override them by writing it out
-## and manually changing values in the json
-mpt_config.save_pretrained(save_directory=dbfs_tmp_dir)
-
-# COMMAND ----------
-
-# MAGIC %sh
-# MAGIC ls $PROJ_TMP_DIR/
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Could of notes: 
-# MAGIC - Revision is important to ensure same behaviour
-# MAGIC - ```device_map``` moves it to gpu
-# MAGIC - ```torch.bfloat16``` helps save memory by halving numeric precision
-
-# COMMAND ----------
-
-model = AutoModelForCausalLM.from_pretrained(model_id,
+  model = AutoModelForCausalLM.from_pretrained(model_id,
                                                revision=model_revision,
-                                               trust_remote_code=True, # needed on both sides
-                                               config=mpt_config,
+                                               trust_remote_code=True, # this can be needed if we reload from cache
+                                               config=model_config,
                                                device_map='auto',
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
                                                cache_dir=dbfs_tmp_cache
                                               )
+  
+  pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer 
+        )
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ### Understanding Generation Config
 # MAGIC
-# MAGIC The pipeline connects the tokenizer to the model entity itself.
+# MAGIC We created a `pipe` entity above. That can be used to generate output from our llm\
+# MAGIC The syntax is: `output = pipe(<text input>, **kwargs)`
+# MAGIC
+# MAGIC If you are using GPU then the output will be a list of dictionaries
+# MAGIC If you are on CPU then the output will be a string
 # MAGIC
 # MAGIC **Key Parameters**
 # MAGIC
-# MAGIC 1. **max_new_tokens**: Defines the maximum number of tokens produced during text generation. Useful for controlling the length of the output.
-# MAGIC 2. **temperature**: Adjusts the randomness in the model's output. Lower values yield more deterministic results, higher values introduce more diversity.
-# MAGIC 3. **eos_token_id**: Token ID that signifies the end of a sentence or sequence. The model stops generating tokens once it generates this token.
-# MAGIC 4. **pad_token_id**: Used to equalize the length of multiple sequences by adding 'pad' tokens. For models that pay attention to padding (like BERT), these tokens are ignored.
-# MAGIC
-
-# COMMAND ----------
-
-mpt_generation_config = GenerationConfig(
-    max_new_tokens = 1024,
-    temperature = 0.1,
-    top_p = 0.92,
-    top_k = 0, 
-    use_cache = True,
-    do_sample = True,
-    eos_token_id = tokenizer.eos_token_id,
-    pad_token_id = tokenizer.pad_token_id
-  )
-
-pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, config=mpt_generation_config 
-        )
+# MAGIC - **max_new_tokens**: Defines the maximum number of tokens produced during text generation. Useful for controlling the length of the output.
+# MAGIC - **temperature**: Adjusts the randomness in the model's output. Lower values yield more deterministic results, higher values introduce more diversity.
+# MAGIC - **repetition_penalty**: Some models will repeat themselves unless you set a repetition penalty
 
 # COMMAND ----------
 
@@ -163,20 +161,53 @@ pipe = pipeline(
 
 # COMMAND ----------
 
+def string_printer(out_obj, run_mode):
+  """
+  Short convenience function because the output formats change between CPU and GPU
+  """
+  if run_mode == 'cpu':
+    print(out_obj)
+  elif run_mode == 'gpu':
+    print(out_obj[0]['generated_text'])
+
+# COMMAND ----------
+
 # We seem to need to set the max length here for mpt model
-output = pipe("How are you?", max_new_tokens=200, repetition_penalty=1.2)
-print(output[0]['generated_text'])
+output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=20, repetition_penalty=1.2)
+string_printer(output, run_mode)
 
 # COMMAND ----------
 
 # repetition_penalty affects whether we get repeats or not
-output = pipe("How are you?", max_new_tokens=20, repetition_penalty=1.2)
-print(output[0]['generated_text'])
+output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=200, repetition_penalty=1.2)
+string_printer(output, run_mode)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Advanced Generation Config
+# MAGIC For a full dive into generation config see the [docs](https://huggingface.co/docs/transformers/generation_strategies)\
+# MAGIC **NOTE** ctransformers does not support all the same configs. See [docs](https://github.com/marella/ctransformers#method-llmgenerate)\
+# MAGIC The ones that are supported will run the same way
+
+# COMMAND ----------
+
+output = pipe("Tell me about what makes a good burger?", max_new_tokens=500, repetition_penalty=1.2)
+string_printer(output, run_mode)
+
+# COMMAND ----------
+
+output = pipe("Tell me about what makes a good burger?", max_new_tokens=200, repetition_penalty=1.2, top_k=3)
+string_printer(output, run_mode)
+
+
+# COMMAND ----------
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC # Logging with MLflow
+# MAGIC **NOTE** TODO move out
+# MAGIC # Managing Prompts w MLFlow
 # MAGIC We will now integate MLflow and show you how you can use it to log sample prompts and responses.\
 # MAGIC
 
