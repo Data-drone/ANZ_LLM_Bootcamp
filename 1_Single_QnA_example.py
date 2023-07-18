@@ -23,7 +23,7 @@ from langchain import HuggingFacePipeline
 from langchain.llms import HuggingFaceHub
 
 # Manual Model building
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import pipeline
 
 # COMMAND ----------
 
@@ -66,6 +66,9 @@ os.environ['HUGGINGFACEHUB_API_TOKEN'] =  "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
 
 data_folder = f'/dbfs/home/{username}/pdf_data'
 file_to_load = data_folder + '/2109.07306.pdf'
+
+# can also set to gpu
+run_mode = 'cpu' # 'gpu'
 
 # COMMAND ----------
 
@@ -204,14 +207,26 @@ except NameError:
 
   # For the config we can see: https://huggingface.co/docs/transformers/main_classes/text_generation#transformers.GenerationConfig
 
-  model_id = "databricks/dolly-v2-3b"
-  tokenizer = AutoTokenizer.from_pretrained(model_id)
-  model = AutoModelForCausalLM.from_pretrained(model_id)
-  pipe = pipeline(
+  if run_mode == 'cpu':
+
+    from ctransformers.langchain import CTransformers
+    model_id = "/local_disk0/mpt-7b-instruct.ggmlv3.q5_0.bin"
+    llm = CTransformers(model=model_id, 
+                    model_type='mpt')
+    #pipe = AutoModelForCausalLM.from_pretrained(model_id, model_type='gpt2', lib='avx')
+    llm_model = HuggingFacePipeline(pipeline=llm)
+
+  elif run_mode == 'gpu':
+
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    model_id = "databricks/dolly-v2-3b"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id)
+    pipe = pipeline(
         "text-generation", model=model, tokenizer=tokenizer, max_length = 2048
         )
 
-  llm_model = HuggingFacePipeline(pipeline=pipe)
+    llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass
