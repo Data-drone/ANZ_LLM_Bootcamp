@@ -173,6 +173,12 @@ def string_printer(out_obj, run_mode):
 # COMMAND ----------
 
 # We seem to need to set the max length here for mpt model
+output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=20, repetition_penalty=0.1)
+string_printer(output, run_mode)
+
+# COMMAND ----------
+
+# We seem to need to set the max length here for mpt model
 output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=20, repetition_penalty=1.2)
 string_printer(output, run_mode)
 
@@ -187,12 +193,13 @@ string_printer(output, run_mode)
 # MAGIC %md
 # MAGIC ### Advanced Generation Config
 # MAGIC For a full dive into generation config see the [docs](https://huggingface.co/docs/transformers/generation_strategies)\
-# MAGIC **NOTE** ctransformers does not support all the same configs. See [docs](https://github.com/marella/ctransformers#method-llmgenerate)\
+# MAGIC **NOTE** `ctransformers` does not support all the same configs. See [docs](https://github.com/marella/ctransformers#method-llmgenerate)\
 # MAGIC The ones that are supported will run the same way
+# MAGIC **TODO** Need a better prompt to show off temperature / top_k
 
 # COMMAND ----------
 
-output = pipe("Tell me about what makes a good burger?", max_new_tokens=500, repetition_penalty=1.2)
+output = pipe("Tell me about what makes a good burger?", max_new_tokens=200, repetition_penalty=1.2)
 string_printer(output, run_mode)
 
 # COMMAND ----------
@@ -200,9 +207,24 @@ string_printer(output, run_mode)
 output = pipe("Tell me about what makes a good burger?", max_new_tokens=200, repetition_penalty=1.2, top_k=3)
 string_printer(output, run_mode)
 
-
 # COMMAND ----------
 
+# MAGIC %md 
+# MAGIC # Picking a model
+# MAGIC Whilst Model providers like Open-AI tend to have one generic model for all usecases, there is more nuance in OpenSource\
+# MAGIC See: https://www.databricks.com/product/machine-learning/large-language-models-oss-guidance
+# MAGIC Different OSS Models have different things that they are trained on.\
+# MAGIC Lets look at the [MPT models](https://www.mosaicml.com/blog/mpt-7b) for example:
+# MAGIC
+# MAGIC This model comes in the variants:
+# MAGIC - Base
+# MAGIC - StoryWriter
+# MAGIC - Instruct
+# MAGIC - Chat
+# MAGIC
+# MAGIC `Base` is the common root for the models. The others are built on top of this.\
+# MAGIC `Instruct` is built to follow instructions as per the [following paper](https://crfm.stanford.edu/2023/03/13/alpaca.html) \
+# MAGIC At a high level we could say that OpenAI ChatGPT would more be a hybrid of Instruct and Chat rather than Base
 # COMMAND ----------
 
 # MAGIC %md 
