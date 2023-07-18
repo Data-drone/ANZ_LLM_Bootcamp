@@ -189,8 +189,13 @@ print(scores)
 
 # COMMAND ----------
 
+%sh wget -P /local_disk0/  https://huggingface.co/TheBloke/MPT-7B-Instruct-GGML/resolve/main/mpt-7b-instruct.ggmlv3.q5_0.bin
+# COMMAND ----------
+
 ## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
 # The only way to clear GPU ram is to detach and reattach
+
+
 
 # This snippet will make sure we don't keep reloading the model and running out of GPU ram
 try:
