@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install langchain pypdf sentence_transformers chromadb
+# MAGIC %pip install langchain pypdf sentence_transformers chromadb ctransformers
 
 # COMMAND ----------
 
