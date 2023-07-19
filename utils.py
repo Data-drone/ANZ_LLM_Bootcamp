@@ -58,6 +58,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
         # See ctransformers docs for more info
         from ctransformers import AutoModelForCausalLM
         model_id = 'TheBloke/open-llama-7B-v2-open-instruct-GGML'
+        #model_id = 'TheBloke/Llama-2-13B-chat-GGML'
         pipe = AutoModelForCausalLM.from_pretrained(model_id,
                                            model_type='llama')
         
@@ -66,6 +67,8 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     elif run_mode == 'gpu':
         from transformers import AutoModelForCausalLM
         model_id = 'VMware/open-llama-7b-v2-open-instruct'
+        # you need to sign up on huggingface first
+        #model_id = 'meta-llama/Llama-2-7b-chat-hf'
         model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
 
         # note when on gpu then this will auto load to gpu
