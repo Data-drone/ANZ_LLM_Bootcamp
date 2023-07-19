@@ -54,13 +54,6 @@ print(str_output)
 
 # COMMAND ----------
 
-prompt = "The red sky is"
-output = pipe(prompt, max_new_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
-# COMMAND ----------
-
 prompt = "Knock Knock"
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
@@ -123,12 +116,13 @@ print(str_output)
 # COMMAND ----------
 
 prompt = """
-    What is the interest rate it following paragraph?
+    What is the interest rate in following paragraph?
+    
     Text: The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
     Interest Rate:
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=60)
 str_output = string_printer(output, run_mode)
 str_output
 
@@ -147,9 +141,9 @@ prompt = """
     What account would you recommend a small business?
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=15)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -161,9 +155,9 @@ prompt = """
     Question: What account would you recommend a consumer?
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=15)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -243,8 +237,7 @@ prompt = f"""
 
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
-
+print(str_output)
 
 # COMMAND ----------
 
@@ -266,26 +259,24 @@ prompt = """
 
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
 user_question = 'What happens to GNNs as you add layers?'
 
 prompt = f"""
-    page-context:
+    page context:
 
-    Graph neural networks (GNNs), a type of neural network that can learn from graphstructured data and learn the representation of nodes through aggregating neighborhood information, have shown superior performance in various downstream
-tasks. However, it is known that the performance of GNNs degrades gradually as
-the number of layers increases. 
+    Graph neural networks (GNNs), a type of neural network that can learn from graphstructured data and learn the representation of nodes through aggregating neighborhood information, have shown superior performance in various downstream tasks. However, it is known that the performance of GNNs degrades gradually as the number of layers increases. 
 
     Based on the page context, answer the following question.
     Question: {user_question}
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=50)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -334,9 +325,5 @@ with mlflow.start_run(run_name='openassist model'):
     raw_output = pipe(prompt, repetition_penalty=1.2)
     text_output = string_printer(raw_output, run_mode)
 
-    mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
-
-
-# COMMAND ----------
-
+    mlflow.llm.log_predictions(inputs=[user_input], outputs=[text_output], prompts=[prompt])
 
