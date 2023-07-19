@@ -7,6 +7,10 @@
 # MAGIC New models with even longer token lengths have been coming as well ie the MPT 7B Model
 
 # COMMAND ----------
+
+%pip install pymupdf pypdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils
+
+# COMMAND ----------
 # DBTITLE 1,Load Libs
 
 from langchain.document_loaders import PyMuPDFLoader
@@ -16,19 +20,11 @@ import os
 # COMMAND ----------
 # DBTITLE 1,Setup
 
-# we will build off of the simple doc analyser from notebook 1
-# we select PyMuPDFLoader in this case but others maybe applicable too
-# Open https://arxiv.org/pdf/2304.10453.pdf on the side as well to follow along
-
-username = spark.sql("SELECT current_user()").first()['current_user()']
-
-#os.environ['HUGGINGFACEHUB_API_TOKEN'] =  dbutils.secrets.get(scope = "brian-hf", key = "hf_key")
-
-data_folder = f'/dbfs/home/{username}/pdf_data'
+%run ./utils
 
 # COMMAND ----------
 
-sample_file_to_load = data_folder + '/2212.10264.pdf'
+sample_file_to_load = source_doc_folder + '/2212.10264.pdf'
 
 # COMMAND ----------
 
@@ -112,6 +108,34 @@ page_dict['blocks'][5]
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC TODO - Basic parser to pull out headings, disgrams and sections. 
+# MAGIC ## Unstructured IO
+# We can try newer more advanced parsers instead of manual coding
 
+# Unstructured seems to show some promise
+# - nltk is required and libs should be pre-installed
+# - unstructured can also use things like detectron2 etc
+
+# COMMAND ----------
+
+import unstructured
+from unstructured.partition.pdf import partition_pdf
+from collections import Counter
+
+# COMMAND ----------
+
+elements = partition_pdf(sample_file_to_load)
+
+display(Counter(type(element) for element in elements))
+
+# COMMAND ----------
+
+display(*[(type(element), element.text) for element in elements[0:13]])
+
+# COMMAND ----------
+
+# Lets see what is in an element
+
+element_to_examine = elements[0]
+
+# COMMAND ----------
 
