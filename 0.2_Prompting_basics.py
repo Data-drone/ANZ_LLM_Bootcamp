@@ -242,6 +242,19 @@ print(str_output)
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC Some models have specific prompts that they are trained on:
+# MAGIC
+# MAGIC ie Llama v3
+# MAGIC
+# MAGIC Below is an instruction that describes a task.
+# MAGIC Write a response that appropriately completes the request.
+# MAGIC ### Instruction:
+# MAGIC <user question>
+# MAGIC ### Response:
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC # Retrieval Augmented Generation
 # MAGIC
 # MAGIC Now if I ask the bot about something left of field
