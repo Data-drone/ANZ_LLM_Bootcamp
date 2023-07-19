@@ -34,24 +34,15 @@ from transformers import pipeline
 # MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note">  The goal here is to get some sort of response not necessarily a good response. We will address that in later sections.
 
 # COMMAND ----------
+
+# DBTITLE 1,Setup dbfs folder paths
 %run ./utils
 # COMMAND ----------
 
-# Setup and config variables
-## We will store data in a local folder for now
-username = spark.sql("SELECT current_user()").first()['current_user()']
-username
-
-data_folder = f'/dbfs/home/{username}/pdf_data'
-file_to_load = data_folder + '/2109.07306.pdf'
+file_to_load = source_doc_folder + '/2109.07306.pdf'
 
 # can also set to gpu
 run_mode = 'cpu' # 'gpu'
-
-# COMMAND ----------
-
-# DBTITLE 1,Let's ensure that we were able to get the PDFs from arXiv
-display(dbutils.fs.ls(f'dbfs:/home/{username}/pdf_data'))
 
 # COMMAND ----------
 
@@ -190,7 +181,8 @@ else:
 # We need to add a search key here
 # k affects the number of documents retrieved.
 ### NOTE a document is not document in the human sense but a chunk from the `CharacterTextSplitter`
-qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", retriever=docsearch.as_retriever(search_kwargs={"k": 2}))
+qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
+                                 retriever=docsearch.as_retriever(search_kwargs={"k": 2}))
 
 # COMMAND ----------
 

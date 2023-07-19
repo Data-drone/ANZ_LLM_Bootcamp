@@ -6,7 +6,11 @@
 # COMMAND ----------
 
 # DBTITLE 1,Extra Libs to install
-# MAGIC %pip install pypdf sentence_transformers pymupdf
+# MAGIC %pip install pypdf sentence_transformers pymupdf ctransformers
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -29,9 +33,8 @@ import torch
 
 # COMMAND ----------
 
-# We will store data in a user folder but it might be better in a generic folder
-username = spark.sql("SELECT current_user()").first()['current_user()']
-username
+# DBTITLE 1,Setup dbfs folder paths
+%run ./utils
 
 # COMMAND ----------
 
@@ -42,22 +45,14 @@ username
 
 # COMMAND ----------
 
-# Setup parameters for getting documents and setting up the index
-# The index SHOULD NOT be in the same folder as the data
-source_doc_folder = f'/home/{username}/pdf_data'
-dbfs_path = '/dbfs' + source_doc_folder
-source_docs = glob.glob(dbfs_path+'/*.pdf')
-
-vector_store_path = f'/home/{username}/vectorstore_persistence/db'
-linux_vector_store_directory = f'/dbfs{vector_store_path}'
-
-# is that right env var?
-os.environ['PERSIST_DIR'] = linux_vector_store_directory
+source_docs = glob.glob(dbfs_source_docs+'/*.pdf')
 
 collection_name = 'arxiv_articles'
 
 # We will use default HuggingFaceEmbeddings for now
-embeddings = HuggingFaceEmbeddings()
+
+embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
+                                   model_kwargs={'device': 'cpu'})
 
 def embed_fn(text):
   hfe = HuggingFaceEmbeddings()
@@ -175,31 +170,19 @@ print('The index includes: {} documents'.format(docsource._collection.count()))
 
 # COMMAND ----------
 
+## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
+# The only way to clear GPU ram is to detach and reattach
+# This snippet will make sure we don't keep reloading the model and running out of GPU ram
 try:
   llm_model
 except NameError:
-
-  # We can just use the model this way but token limits and fine tuning can be problematic
-  #llm_model = HuggingFaceHub(repo_id="google/flan-ul2", 
-  #                              model_kwargs={"temperature":0.1, "max_new_tokens":1024})
-
-  # We will create a huggingface pipeline and work with that
-  # See: https://huggingface.co/docs/transformers/main_classes/pipelines
-  # We need to have "text-generation" as the task
-
-  # For the config we can see: https://huggingface.co/docs/transformers/main_classes/text_generation#transformers.GenerationConfig
-
-  model_id = "databricks/dolly-v2-3b"
-  tokenizer = AutoTokenizer.from_pretrained(model_id)
-  model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto',
-                                               torch_dtype=torch.bfloat16)
-
-  pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 2048, 
-        device=0
-        )
-
-  llm_model = HuggingFacePipeline(pipeline=pipe)
+  if run_mode == 'cpu':
+    # the cTransformers class interfaces with langchain differently
+    from ctransformers.langchain import CTransformers
+    llm_model = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
+  elif run_mode == 'gpu':
+    pipe = load_model(run_mode, dbfs_tmp_cache)
+    llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass

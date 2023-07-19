@@ -23,6 +23,16 @@ dbutils.fs.mkdirs(cache_dir)
 dbfs_tmp_cache = f'/dbfs{cache_dir}'
 os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
 
+# setup source file_docs
+source_doc_folder = f'/home/{username}/pdf_data'
+dbfs_source_docs = '/dbfs' + source_doc_folder
+
+# setup vectorstore path
+vector_store_path = f'/home/{username}/vectorstore_persistence/db'
+linux_vector_store_directory = f'/dbfs{vector_store_path}'
+
+# is that right env var?
+os.environ['PERSIST_DIR'] = linux_vector_store_directory
 
 # COMMAND ----------
 
