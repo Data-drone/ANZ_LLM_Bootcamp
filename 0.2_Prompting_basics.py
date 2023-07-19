@@ -1,14 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Prompting Basics
-
+# MAGIC
 # MAGIC Lets explore the basics of prompting\
 # MAGIC For more details see: https://www.promptingguide.ai/
 
 # COMMAND ----------
 
 # DBTITLE 1,Install ctransformers for CPU inference
-%pip install ctransformers==0.2.13
+# MAGIC %pip install ctransformers==0.2.13
 
 # COMMAND ----------
 
@@ -17,14 +17,16 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 run_mode = 'cpu' # or gpu
+
 # COMMAND ----------
 
 # DBTITLE 1,Setup
-%run ./utils
+# MAGIC %run ./utils
 
 # COMMAND ----------
 
 pipe = load_model(run_mode, dbfs_tmp_cache)
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -35,7 +37,8 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 # MAGIC %md
 # MAGIC # Basic Prompts
 # MAGIC Getting started is easy, we can send text in.
-# MAGIC Remember that different models will respond differently\
+# MAGIC Remember that different models will respond differently!
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -47,20 +50,21 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 prompt = "The sky is"
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
+
 # COMMAND ----------
 
 prompt = "The red sky is"
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
 prompt = "Knock Knock"
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -69,9 +73,9 @@ prompt = """
     Who's there?
     """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=10)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -87,9 +91,22 @@ prompt = """
     Sentiment:
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=20)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
+
+# COMMAND ----------
+
+# DBTITLE 1,We restrict the max_new_tokens to just 3 (Positive/Negative/Neutral)
+prompt = """
+    Classify the text into neutral, negative or positive.
+    Text: I think the vacation is okay.
+    Sentiment:
+"""
+
+output = pipe(prompt, max_new_tokens=3)
+str_output = string_printer(output, run_mode)
+print(str_output)
 
 # COMMAND ----------
 
@@ -101,7 +118,7 @@ prompt = """
 
 output = pipe(prompt, max_new_tokens=100)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
@@ -150,7 +167,7 @@ str_output
 
 # COMMAND ----------
 
-
+# MAGIC
 # MAGIC %md
 # MAGIC # Chain of Thought Prompting
 # MAGIC
@@ -239,7 +256,7 @@ str_output
 # MAGIC Training is expensive
 # MAGIC What if we gave it an except?
 # MAGIC
-
+# MAGIC
 
 # COMMAND ----------
 
@@ -277,12 +294,13 @@ str_output
 # MAGIC As we can see logging prompts can be hard!\
 # MAGIC You might have already ended up with spreadsheets of prompts and replies!\
 # MAGIC Whilst MLflow support for LLMs is still an area of improvement we have made great strides already\
-# MAGIC 
+# MAGIC
 # MAGIC See: https://www.databricks.com/blog/2023/04/18/introducing-mlflow-23-enhanced-native-llm-support-and-new-features.html
 # MAGIC See: https://www.databricks.com/blog/announcing-mlflow-24-llmops-tools-robust-model-evaluation
 # MAGIC
 # MAGIC We will quickly review the llm tracking API from the 2.3 addition\
 # MAGIC For full descriptions see: https://mlflow.org/docs/latest/llm-tracking.html
+
 # COMMAND ----------
 
 import mlflow
@@ -313,8 +331,12 @@ with mlflow.start_run(run_name='openassist model'):
             {user_input}
             """
 
-    raw_output = pipe(prompt, max_length=200, repetition_penalty=1.2)
+    raw_output = pipe(prompt, repetition_penalty=1.2)
     text_output = string_printer(raw_output, run_mode)
 
     mlflow.llm.log_predictions(inputs=user_input, outputs=text_output, prompts=prompt)
+
+
+# COMMAND ----------
+
 

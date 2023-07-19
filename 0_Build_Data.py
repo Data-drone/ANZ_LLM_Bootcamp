@@ -3,6 +3,7 @@
 # MAGIC This is an example for how to use Langchain
 
 # COMMAND ----------
+
 import os
 
 # We will setup a folder to store the files
@@ -11,6 +12,7 @@ username
 
 dbfs_path = f'/home/{username}/pdf_data'
 os.environ['DATASTASH_FOLDER'] = dbfs_path
+
 # COMMAND ----------
 
 # we will use this dbfs folder
@@ -45,3 +47,12 @@ dbutils.fs.mkdirs(dbfs_path)
 
 # MAGIC %sh
 # MAGIC wget https://arxiv.org/pdf/2010.11934.pdf -U me-me-me -P /dbfs$DATASTASH_FOLDER
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC wget https://arxiv.org/pdf/1706.03762.pdf -U me-me-me -P /dbfs$DATASTASH_FOLDER
+
+# COMMAND ----------
+
+

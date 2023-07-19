@@ -36,10 +36,9 @@ from transformers import pipeline
 # COMMAND ----------
 
 # DBTITLE 1,Setup dbfs folder paths
-%run ./utils
-# COMMAND ----------
+# MAGIC %run ./utils
 
-file_to_load = source_doc_folder + '/2109.07306.pdf'
+# COMMAND ----------
 
 # can also set to gpu
 run_mode = 'cpu' # 'gpu'
@@ -47,6 +46,7 @@ run_mode = 'cpu' # 'gpu'
 # COMMAND ----------
 
 # As a first step we need to load and parse the document
+file_to_load = '/dbfs' + source_doc_folder + '/1706.03762.pdf'
 
 loader = PyPDFLoader(file_to_load)
 # This splits it into pages
@@ -103,7 +103,7 @@ docsearch
 # DBTITLE 1,Verify that the index is working
 
 # We want to quickly verify as with the pace these libraries evolve, things can break often
-query = "What is important to have open LLMs?"
+query = "Why are Transformers more performant than Recurrent Neural Networks?"
 
 docs = docsearch.similarity_search(query)
 print(docs[0].page_content)
@@ -115,10 +115,14 @@ print(docs[0].page_content)
 
 # COMMAND ----------
 
-for t in texts: 
-  t.metadata = {"source": "https://arxiv.org/abs/2109.07306"}
+for i, t in enumerate(texts): 
+  if i % 2:
+    t.metadata = {"source": "https://arxiv.org/pdf/1706.03762.pdf"}
+  else:
+    t.metadata = {"source": "Uknown"}
 
 print(texts[0].metadata)
+print(texts[1].metadata)
 
 # COMMAND ----------
 
@@ -140,11 +144,12 @@ docsearch_metadata = (
 
 docs = (
   docsearch_metadata.similarity_search(
-    query="What is important to have open LLMs?",
-    filter={"source": "https://arxiv.org/abs/2109.07306"})
+    query="What is a Transformer?",
+    filter={"source": "https://arxiv.org/pdf/1706.03762.pdf"})
 )
 
-docs[0].metadata
+print(f'Metadata of the document is: {docs[0].metadata}')
+print(f'Some text from the returned page: "{docs[0].page_content[0:50]}"')
 
 # COMMAND ----------
 
