@@ -22,13 +22,13 @@ import os
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 
-os.environ['HUGGINGFACEHUB_API_TOKEN'] =  dbutils.secrets.get(scope = "brian-hf", key = "hf_key")
+#os.environ['HUGGINGFACEHUB_API_TOKEN'] =  dbutils.secrets.get(scope = "brian-hf", key = "hf_key")
 
 data_folder = f'/dbfs/home/{username}/pdf_data'
 
 # COMMAND ----------
 
-sample_file_to_load = data_folder + '/2304.10453.pdf'
+sample_file_to_load = data_folder + '/2212.10264.pdf'
 
 # COMMAND ----------
 

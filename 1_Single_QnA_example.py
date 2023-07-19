@@ -34,24 +34,6 @@ from transformers import pipeline
 # MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note">  The goal here is to get some sort of response not necessarily a good response. We will address that in later sections.
 
 # COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Generate API tokens
-# MAGIC For many of the services that we'll using in the notebook, we'll need some API keys. Follow the instructions below to generate your own. 
-# MAGIC
-# MAGIC ### Hugging Face Hub
-# MAGIC 1. Go to this [Inference API page](https://huggingface.co/inference-api) and click "Sign Up" on the top right.
-# MAGIC
-# MAGIC <img src="https://files.training.databricks.com/images/llm/hf_sign_up.png" width=700>
-# MAGIC
-# MAGIC 2. Once you have signed up and confirmed your email address, click on your user icon on the top right and click the `Settings` button. 
-# MAGIC
-# MAGIC 3. Navigate to the `Access Token` tab and copy your token. 
-# MAGIC
-# MAGIC <img src="https://files.training.databricks.com/images/llm/hf_token_page.png" width=500>
-# MAGIC
-
-# COMMAND ----------
 %run ./utils
 # COMMAND ----------
 
@@ -59,12 +41,6 @@ from transformers import pipeline
 ## We will store data in a local folder for now
 username = spark.sql("SELECT current_user()").first()['current_user()']
 username
-
-# See: https://docs.databricks.com/security/secrets/example-secret-workflow.html
-# To learn how to set secrets
-# We need to set this to pull from huggingface hub - You can get a token here
-# https://huggingface.co/docs/hub/security-tokens
-# os.environ['HUGGINGFACEHUB_API_TOKEN'] =  "<token_if_needed>"
 
 data_folder = f'/dbfs/home/{username}/pdf_data'
 file_to_load = data_folder + '/2109.07306.pdf'
@@ -194,33 +170,17 @@ print(scores)
 
 ## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
 # The only way to clear GPU ram is to detach and reattach
-
-
-
 # This snippet will make sure we don't keep reloading the model and running out of GPU ram
 try:
   llm_model
 except NameError:
-
-  # We can just use the model this way but token limits and fine tuning can be problematic
-  #llm_model = HuggingFaceHub(repo_id="google/flan-ul2", 
-  #                              model_kwargs={"temperature":0.1, "max_new_tokens":1024})
-
-  # We will create a huggingface pipeline and work with that
-  # See: https://huggingface.co/docs/transformers/main_classes/pipelines
-  # We need to have "text-generation" as the task
-
-  # For the config we can see: https://huggingface.co/docs/transformers/main_classes/text_generation#transformers.GenerationConfig
-
-  # TODO fix the task shenanigans
-  #from ctransformers.langchain import CTransformers
-
-  #pipe = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
-  #llm_model = HuggingFacePipeline(pipeline=pipe)
-
-  pipe = load_model(run_mode, dbfs_tmp_cache)
-
-  llm_model = HuggingFacePipeline(pipeline=pipe)
+  if run_mode == 'cpu':
+    # the cTransformers class interfaces with langchain differently
+    from ctransformers.langchain import CTransformers
+    llm_model = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
+  elif run_mode == 'gpu':
+    pipe = load_model(run_mode, dbfs_tmp_cache)
+    llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass
