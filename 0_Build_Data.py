@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC This is an example for how to use Langchain
+# MAGIC This notebook will setup the datasets to use for exploring LLM RAGs
 
 # COMMAND ----------
 
@@ -10,13 +10,7 @@ import os
 username = spark.sql("SELECT current_user()").first()['current_user()']
 username
 
-dbfs_path = f'/home/{username}/pdf_data'
-os.environ['DATASTASH_FOLDER'] = dbfs_path
-
-# COMMAND ----------
-
-# we will use this dbfs folder
-dbutils.fs.mkdirs(dbfs_path)
+os.environ['DATASTASH_FOLDER'] = dbfs_source_docs
 
 # COMMAND ----------
 
