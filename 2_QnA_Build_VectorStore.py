@@ -44,7 +44,8 @@ import torch
 # MAGIC We need to have some sort of index and we will need to manage this ourselves.
 
 # COMMAND ----------
-
+# for class
+#source_docs = glob.glob('/dbfs/bootcamp_data/pdf_data/*.pdf')
 source_docs = glob.glob(dbfs_source_docs+'/*.pdf')
 
 collection_name = 'arxiv_articles'
@@ -179,7 +180,7 @@ except NameError:
   if run_mode == 'cpu':
     # the cTransformers class interfaces with langchain differently
     from ctransformers.langchain import CTransformers
-    llm_model = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
+    llm_model = CTransformers(model='TheBloke/Llama-2-7B-Chat-GGML', model_type='llama')
   elif run_mode == 'gpu':
     pipe = load_model(run_mode, dbfs_tmp_cache)
     llm_model = HuggingFacePipeline(pipeline=pipe)
