@@ -1,6 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC This notebook will setup the datasets to use for exploring LLM RAGs
+# MAGIC This notebook will setup the datasets and preload the big models to use for exploring LLM RAGs
+# MAGIC This notebook is just if you are setting up locally after the workshop
+# MAGIC In a workshop the instructor should run and set this up
 
 # COMMAND ----------
 
