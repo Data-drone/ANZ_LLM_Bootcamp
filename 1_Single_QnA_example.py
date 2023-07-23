@@ -46,7 +46,10 @@ run_mode = 'cpu' # 'gpu'
 # COMMAND ----------
 
 # As a first step we need to load and parse the document
-file_to_load = '/dbfs' + source_doc_folder + '/1706.03762.pdf'
+# for a class 
+#file_to_load = '/dbfs/bootcamp_data/pdf_data/2203.02155.pdf'
+file_to_load = '/dbfs' + source_doc_folder + '/2303.10130.pdf'
+file_path = 'https://arxiv.org/pdf/2303.10130.pdf'
 
 loader = PyPDFLoader(file_to_load)
 # This splits it into pages
@@ -68,7 +71,7 @@ type(page_0)
 # We will feed all pages in
 # chunk_size is a key parameter.
 # For more advanced use we may want to tune this or use a paragraph splitter or something else
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+text_splitter = CharacterTextSplitter(chunk_size=700, chunk_overlap=100)
 texts = text_splitter.split_documents(pages)
 
 # COMMAND ----------
@@ -79,7 +82,7 @@ texts[1]
 
 # MAGIC %md
 # MAGIC
-# MAGIC ### Use Chroma wth LangChain
+# MAGIC ### Setup Chromadb
 # MAGIC
 # MAGIC We utilise the ```HuggingFaceEmbeddings()``` from LangChain which defaults to ```sentence-transformers/all-mpnet-base-v2``` to generate our text embeddings. However, note that Chroma can handle tokenization, embedding, and indexing automatically for you. If you would like to change the embedding model, read [here on how to do that](https://docs.trychroma.com/embeddings). You will need instantiate the ```collection``` yourself instead of using the LangChain wrapper.
 # MAGIC
@@ -103,7 +106,7 @@ docsearch
 # DBTITLE 1,Verify that the index is working
 
 # We want to quickly verify as with the pace these libraries evolve, things can break often
-query = "Why are Transformers more performant than Recurrent Neural Networks?"
+query = "Does making language models bigger improve intent following?"
 
 docs = docsearch.similarity_search(query)
 print(docs[0].page_content)
@@ -117,7 +120,7 @@ print(docs[0].page_content)
 
 for i, t in enumerate(texts): 
   if i % 2:
-    t.metadata = {"source": "https://arxiv.org/pdf/1706.03762.pdf"}
+    t.metadata = {"source": file_path}
   else:
     t.metadata = {"source": "Uknown"}
 
@@ -144,8 +147,8 @@ docsearch_metadata = (
 
 docs = (
   docsearch_metadata.similarity_search(
-    query="What is a Transformer?",
-    filter={"source": "https://arxiv.org/pdf/1706.03762.pdf"})
+    query="What do we call models that use reinforcement learning with human feedback?",
+    filter={"source": file_path})
 )
 
 print(f'Metadata of the document is: {docs[0].metadata}')
@@ -158,7 +161,7 @@ print(f'Some text from the returned page: "{docs[0].page_content[0:50]}"')
 
 # COMMAND ----------
 
-docs = docsearch_metadata.similarity_search_with_score("What is important to have open LLMs?")
+docs = docsearch_metadata.similarity_search_with_score("What do we call models that use reinforcement learning with human feedback?")
 scores = [d[1] for d in docs]
 print(scores)
 
@@ -173,7 +176,7 @@ except NameError:
   if run_mode == 'cpu':
     # the cTransformers class interfaces with langchain differently
     from ctransformers.langchain import CTransformers
-    llm_model = CTransformers(model='TheBloke/open-llama-7B-v2-open-instruct-GGML', model_type='llama')
+    llm_model = CTransformers(model='TheBloke/Llama-2-7B-Chat-GGML', model_type='llama')
   elif run_mode == 'gpu':
     pipe = load_model(run_mode, dbfs_tmp_cache)
     llm_model = HuggingFacePipeline(pipeline=pipe)
@@ -183,11 +186,24 @@ else:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC # Chaining together logic - Introducing Langchain
+# MAGIC Lets now use Langchain to help us connect everything together\
+# MAGIC Before, we would have to manually collect the chromadb outputs,\
+# MAGIC construct a prompt and add the content then send it to the llm.\
+# MAGIC Langchain has a single function for all this: `RetrievalQA`
+# MAGIC
+# MAGIC We can see the prompt that it uses here:
+# MAGIC - https://github.com/hwchase17/langchain/tree/master/libs/langchain/langchain/chains/retrieval_qa
+
+
+# COMMAND ----------
+
 # We need to add a search key here
 # k affects the number of documents retrieved.
 ### NOTE a document is not document in the human sense but a chunk from the `CharacterTextSplitter`
 qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
-                                 retriever=docsearch.as_retriever(search_kwargs={"k": 2}))
+                                 retriever=docsearch.as_retriever(search_kwargs={"k": 3}))
 
 # COMMAND ----------
 
