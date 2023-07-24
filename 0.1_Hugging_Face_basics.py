@@ -38,23 +38,15 @@ dbutils.library.restartPython()
 # MAGIC Configure databricks storage locations and caching. By default databricks uses dbfs to store information.\ 
 # MAGIC HuggingFace will by default cache to a root path folder. We can change that so that we don't have to redownload if the cluster terminates.
 # MAGIC [dbutils](https://docs.databricks.com/dev-tools/databricks-utils.html) is a databricks utility for working with the object store tier.
+
 # COMMAND ----------
-import os
 
-username = spark.sql("SELECT current_user()").first()['current_user()']
-os.environ['USERNAME'] = username
+# MAGIC %run ./utils
 
-tmp_user_folder = f'/tmp/{username}'
-dbutils.fs.mkdirs(tmp_user_folder)
-dbfs_tmp_dir = f'/dbfs{tmp_user_folder}'
-os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
+# COMMAND ----------
 
-# setting up transformers cache
-cache_dir = f'{tmp_user_folder}/.cache'
-dbutils.fs.mkdirs(cache_dir)
-dbfs_tmp_cache = f'/dbfs{cache_dir}'
-os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
-
+#for classroom
+#dbfs_tmp_cache = '/dbfs/bootcamp_data/hf_cache/'
 run_mode = 'cpu'
 
 # COMMAND ----------
@@ -95,6 +87,7 @@ run_mode = 'cpu'
 from transformers import AutoTokenizer, pipeline, AutoConfig, GenerationConfig
 import torch
 
+#classroom_path = '/'
 
 if run_mode == 'cpu':
 
@@ -102,14 +95,15 @@ if run_mode == 'cpu':
   # You would need to `wget` then weights then use a model_path config instead.
   # See ctransformers docs for more info
   from ctransformers import AutoModelForCausalLM
-  model_id = 'TheBloke/open-llama-7B-v2-open-instruct-GGML'
+  model_id = 'TheBloke/Llama-2-13B-chat-GGML'
+  #model_id = f''
   pipe = AutoModelForCausalLM.from_pretrained(model_id,
                                            model_type='llama')
 
 elif run_mode == 'gpu':
   from transformers import AutoModelForCausalLM
-  model_id = 'VMware/open-llama-7b-v2-open-instruct'
-  model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
+  model_id = 'meta-llama/Llama-2-7b-chat-hf'
+  model_revision = '40c5e2b32261834431f89850c8d5359631ffa764'
 
   # note when on gpu then this will auto load to gpu
   # this will take approximately an extra 1GB of VRAM
