@@ -87,7 +87,6 @@ run_mode = 'cpu'
 from transformers import AutoTokenizer, pipeline, AutoConfig, GenerationConfig
 import torch
 
-#classroom_path = '/'
 
 if run_mode == 'cpu':
 
@@ -167,7 +166,7 @@ def string_printer(out_obj, run_mode):
 # COMMAND ----------
 
 # We seem to need to set the max length here for mpt model
-output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=20, repetition_penalty=0.1)
+output = pipe("Tell me how you have been and any signifcant things that have happened to you?", max_new_tokens=200, repetition_penalty=0.1)
 string_printer(output, run_mode)
 
 # COMMAND ----------
@@ -198,7 +197,7 @@ string_printer(output, run_mode)
 
 # COMMAND ----------
 
-output = pipe("Tell me about what makes a good burger?", max_new_tokens=200, repetition_penalty=1.2, top_k=3)
+output = pipe("Tell me about what makes a good burger?", max_new_tokens=200, repetition_penalty=1.2, top_k=100)
 string_printer(output, run_mode)
 
 # COMMAND ----------
