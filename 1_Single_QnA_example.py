@@ -29,7 +29,11 @@ from transformers import pipeline
 
 # MAGIC %md
 # MAGIC In this example we will load up a single pdf and ask questions and answers of it.
-# MAGIC Most examples use OpenAI here we wil try out Dolly v2 and huggingface libraries
+# MAGIC Most examples use OpenAI here we wil try out Llama v2.
+# MAGIC
+# MAGIC Ours goal is twofold:
+# MAGIC - Find a way to convert our source data into useful snippets that can be inserted into prompts as context
+# MAGIC - To use our vector db to provide relevant chunks for use in our prompts
 # MAGIC
 # MAGIC <img src="https://files.training.databricks.com/images/icon_note_32.png" alt="Note">  The goal here is to get some sort of response not necessarily a good response. We will address that in later sections.
 
@@ -47,9 +51,11 @@ run_mode = 'cpu' # 'gpu'
 
 # As a first step we need to load and parse the document
 # for a class 
-#file_to_load = '/dbfs/bootcamp_data/pdf_data/2203.02155.pdf'
-file_to_load = '/dbfs' + source_doc_folder + '/2303.10130.pdf'
-file_path = 'https://arxiv.org/pdf/2303.10130.pdf'
+
+# https://arxiv.org/pdf/2204.01691.pdf
+#file_to_load = '/dbfs/bootcamp_data/pdf_data/2204.01691.pdf'
+file_to_load = '/dbfs' + source_doc_folder + '/2204.01691.pdf'
+file_path = 'https://arxiv.org/pdf/2204.01691.pdf'
 
 loader = PyPDFLoader(file_to_load)
 # This splits it into pages
@@ -76,6 +82,7 @@ texts = text_splitter.split_documents(pages)
 
 # COMMAND ----------
 
+# Lets see what a chunk is
 texts[1]
 
 # COMMAND ----------
@@ -213,10 +220,53 @@ qa.run(query)
 
 # COMMAND ----------
 
+# MAGIC %md If you got the same result as we did in testing it might be total nonsense!
+# MAGIC
+# MAGIC ```
+# MAGIC The document.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\
+# MAGIC n\n\n\n\n\n\n\n\n\nfashion design to Q  the following prompts 
+# MAGIC and \n\n\n\n\nThe question below 5555530 \n\n\n\n\n\nWhat is 
+# MAGIC here:The answer, this document.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n
+# MAGIC \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n
+# MAGIC \n\n\n\n\n\n\n\n\n\n\n\n\n\n    question : BC in complete in seconds 
+# MAGIC eldou can be used to the following the question is required\n\n\n\n\n
+# MAGIC Filling Answer at  Please help wanted ----------\n\n\n\n\n\n\n\n\n\n\n\n
+# MAGIC \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n
+# MAGIC \n\n\n\nThe question at the following context (eBotry Answer Later 777:\n\n\n\n\n\n
+# MAGIC ```
+# MAGIC
+# MAGIC Lets see if we can work out why
+# COMMAND ----------
+
+docsearch.similarity_search(query)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC if you got the same result as us you would see the snippets are mostly useless
+# MAGIC That was a bad retrieval from our doc store
+# MAGIC It means that we need to look into chunking strategy and filtering methods
+# MAGIC We know that the document is about large language models
+# MAGIC Lets adjust the query so that we can "trigger" those keywords and embeddings.
+# COMMAND ----------
+
+query = 'Are large language models grounded in reality? if not what can we do?'
+docsearch.similarity_search(query)
+# COMMAND ----------
+
+
+
 # Test Query 2
 query = "What are some key facts from this document?"
 qa.run(query)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC You can see that all the '\n' from the formatting is having an effect
+# MAGIC We haven't discussed it but developers have found that order of snippets
+# MAGIC can also have an effect. LLMs can be very sensitive to input
 
+
+
+# COMMAND ----------
