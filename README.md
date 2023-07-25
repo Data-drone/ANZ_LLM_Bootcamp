@@ -12,4 +12,4 @@ On Databricks, you can select the Single Node instance type and select the runti
 
 ### Further Reading and Learnings
 - We have a great catalog of LLM related talks at the Data and AI Summit [link here](https://www.databricks.com/dataaisummit/llm/)
-- For a set of great examples on fine-tuning these LLMs, we recommend looking at (the Databricks ML examples repo)[https://github.com/databricks/databricks-ml-examples/tree/master]
+- For a set of great examples on fine-tuning these LLMs, we recommend looking at [the Databricks ML examples repo](https://github.com/databricks/databricks-ml-examples/tree/master)
