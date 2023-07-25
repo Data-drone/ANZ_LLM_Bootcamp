@@ -171,11 +171,11 @@ page_dict['blocks'][5]
 
 # MAGIC %md
 # MAGIC ## Advanced Parsing of PDFs
-# We can try newer more advanced parsers instead of manual coding
+# MAGIC We can try newer more advanced parsers instead of manual coding
 
-# Unstructured seems to show some promise
-# - nltk is required and libs should be pre-installed
-# - unstructured can also use things like detectron2 etc
+# MAGIC Unstructured seems to show some promise
+# MAGIC - nltk is required and libs should be pre-installed
+# MAGIC - unstructured can also use things like detectron2 etc
 
 # COMMAND ----------
 
