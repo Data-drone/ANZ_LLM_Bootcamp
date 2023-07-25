@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Advanced Embeddings
+# MAGIC # Advanced Chunking & Parsing
 # MAGIC In order to building better query engines we need to experiment more with our embeddings
 # MAGIC  
 # MAGIC Dolly and other GPT-J models are build with 2048 token length whereas OpenAI has a token length of 4096
@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-%pip install pymupdf pypdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils
+%pip install pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers
 
 # COMMAND ----------
 # DBTITLE 1,Load Libs
