@@ -24,20 +24,37 @@ import os
 
 # COMMAND ----------
 
-sample_file_to_load = source_doc_folder + '/2212.10264.pdf'
+# source_doc_folder = f'/dbfs/bootcamp_data/pdf_data'
+sample_file_to_load = source_doc_folder + '/2302.07842.pdf'
 
 # COMMAND ----------
 
-loader = PyMuPDFLoader(sample_file_to_load)
-loader.load_and_split()
+# load a model for testing
+run_mode = 'cpu'
+pipe = load_model(run_mode, dbfs_tmp_cache)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC We can see that the data isn't really structured properly. 
-# MAGIC Headings and text is mixed up any logic is lost. We can probably do better and get better embeddings.
+# MAGIC # Basic File Loading 
 
-# MAGIC # Experiment with PyMuPDF
+# COMMAND ----------
+
+loader = PyMuPDFLoader(sample_file_to_load)
+docu_split = loader.load_and_split()
+
+# COMMAND ----------
+
+docu_split
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Manually loading and parsing pdf
 
 # COMMAND ----------
 import fitz 
