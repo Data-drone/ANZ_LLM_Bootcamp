@@ -49,6 +49,63 @@ docu_split
 
 # COMMAND ----------
 
+context = docu_split[0].page_content
+docu_split[0].page_content
+
+# COMMAND ----------
+
+system_prompt = f'<<SYS>>You are a helpful chatbot that is review the page context provided and answering a question based on that<<SYS>>'
+
+question = 'How can we augment Large Language Models?'
+
+prompt_template = f"""{system_prompt}
+[INST]
+Based on the below paragraph, answer the user question:
+
+{context}
+
+User: {question}
+[/INST]
+
+Assistant:"""
+
+# COMMAND ----------
+
+pipe(prompt_template, max_new_tokens=100, repetition_penalty=1.2)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Lets see what happens if we manually bring in a useful paragraph instead 
+
+# COMMAND ----------
+
+context = f'This survey reviews works in which language models (LMs) are augmented with reasoning
+skills and the ability to use tools. The former is defined as decomposing a potentially
+complex task into simpler subtasks while the latter consists in calling external modules such
+as a code interpreter. LMs can leverage these augmentations separately or in combination
+via heuristics, or learn to do so from demonstrations. While adhering to a standard missing
+tokens prediction objective, such augmented LMs can use various, possibly non-parametric
+external modules to expand their context processing ability, thus departing from the pure
+language modeling paradigm. We therefore refer to them as Augmented Language Models
+(ALMs). The missing token objective allows ALMs to learn to reason, use tools, and even
+act, while still performing standard natural language tasks and even outperforming most
+regular LMs on several benchmarks. In this work, after reviewing current advance in ALMs,
+we conclude that this new research direction has the potential to address common limitations
+of traditional LMs such as interpretability, consistency, and scalability issues.'
+
+prompt_template = f"""{system_prompt}
+[INST]
+Based on the below paragraph, answer the user question:
+
+{context}
+
+User: {question}
+[/INST]
+
+Assistant:"""
+
+pipe(prompt_template, max_new_tokens=100, repetition_penalty=1.2)
 
 
 # COMMAND ----------
@@ -125,7 +182,7 @@ page_dict['blocks'][5]
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Unstructured IO
+# MAGIC ## Advanced Parsing of PDFs
 # We can try newer more advanced parsers instead of manual coding
 
 # Unstructured seems to show some promise
@@ -150,9 +207,17 @@ display(*[(type(element), element.text) for element in elements[0:13]])
 
 # COMMAND ----------
 
-# Lets see what is in an element
-
-element_to_examine = elements[0]
+display(*[(type(element), element.text) for element in elements[100:105]])
 
 # COMMAND ----------
 
+# Lets see what is in an element
+
+element_to_examine = elements[0]
+element_to_examine
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
