@@ -11,4 +11,5 @@ For optimal performance, we recommend running on ```g5.4xlarge``` instances on A
 On Databricks, you can select the Single Node instance type and select the runtime and infrastructure above. If you run into capacity issues, we have supplemented the notebooks with CPU editions. In this case, feel free to use ```i3.4xlarge``` or ```m``` series. Please note that this will not have optimal performance. 
 
 ### Further Reading and Learnings
-We have a great catalog of LLM related talks at the Data and AI Summit [link here](https://www.databricks.com/dataaisummit/llm/)
+- We have a great catalog of LLM related talks at the Data and AI Summit [link here](https://www.databricks.com/dataaisummit/llm/)
+- For a set of great examples on fine-tuning these LLMs, we recommend looking at (the Databricks ML examples repo)[https://github.com/databricks/databricks-ml-examples/tree/master]
