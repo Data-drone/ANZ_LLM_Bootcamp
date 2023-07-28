@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-%pip install pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers
+%pip install pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers scrapy
 
 # COMMAND ----------
 # DBTITLE 1,Load Libs
@@ -36,7 +36,9 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Basic File Loading 
+# MAGIC # Basic File Loading
+# MAGIC We will just use the generic loader for this stage.
+# MAGIC The load_and_split function will handle that
 
 # COMMAND ----------
 
@@ -53,6 +55,11 @@ context = docu_split[0].page_content
 docu_split[0].page_content
 
 # COMMAND ----------
+
+# Note that this is specifically for Llama 2
+# Different models may have different prompt format
+# getting this wrong can have big effects
+# The native ones baked into Langchain are all OpenAI focused and not llama 2 focused.
 
 system_prompt = f'<<SYS>>You are a helpful chatbot that is review the page context provided and answering a question based on that<<SYS>>'
 
@@ -206,6 +213,52 @@ element_to_examine
 
 # COMMAND ----------
 
-
+# MAGIC %md
+# MAGIC ## Parsing HTML
 
 # COMMAND ----------
+
+# Lets create a temp dir
+temp_scrape_dir = f'/tmp/{username}/web_scrape'
+dbutils.fs.mkdirs(temp_scrape_dir)
+dbfs_temp_scrape_dir = f'/dbfs{temp_scrape_dir}'
+
+# COMMAND ----------
+
+# We will setup a Scrapy bot
+import scrapy 
+from scrapy.crawler import CrawlerProcess
+
+class RAGSpider(scrapy.Spider):
+  name = 'skynet_spider'
+  allowed_domains = ['<>']
+  start_urls = ['<>']
+
+  custom_settings = {
+    'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'ITEM_PIPELINES': {
+      'scrapy.pipelines.files.FilePipeline': 1,
+    },
+    'FILES_STORE': dbfs_temp_scrape_dir,
+  }
+
+  def parse(self, response):
+    # Save the HTML page for the current URL
+    page_url = response.url.split('/')[-1]
+    with open(f'{dbfs_temp_scrape_dir}/{page_url}.html', 'wb') as f:
+      f.write(response.body)
+
+def run_spider():
+  process = CrawlerProcess(settings={
+    'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'CLOSESPIDER_PAGECOUNT': 1,
+  })
+  process.crawl(RAGSpider)
+  process.start()
+
+  process.stop()
+  return
+
+# COMMAND ----------
+
+run_spider()
