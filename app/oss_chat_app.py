@@ -10,7 +10,7 @@ import openai
 import os
 import torch
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig
 from transformers import StoppingCriteria, StoppingCriteriaList
 
 
