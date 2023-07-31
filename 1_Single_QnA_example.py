@@ -53,9 +53,9 @@ run_mode = 'cpu' # 'gpu'
 # for a class 
 
 # https://arxiv.org/pdf/2204.01691.pdf
-#file_to_load = '/dbfs/bootcamp_data/pdf_data/2204.01691.pdf'
-file_to_load = '/dbfs' + source_doc_folder + '/2204.01691.pdf'
-file_path = 'https://arxiv.org/pdf/2204.01691.pdf'
+#file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
+file_to_load = '/dbfs' + source_doc_folder + '/2302.09419.pdf'
+file_path = 'https://arxiv.org/pdf/2302.09419.pdf'
 
 loader = PyPDFLoader(file_to_load)
 # This splits it into pages
@@ -216,7 +216,8 @@ qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff",
 
 # Test Query 1
 query = "What is this document about?"
-qa.run(query)
+result = qa.run(query)
+print(result)
 
 # COMMAND ----------
 
@@ -235,7 +236,48 @@ qa.run(query)
 # MAGIC \n\n\n\nThe question at the following context (eBotry Answer Later 777:\n\n\n\n\n\n
 # MAGIC ```
 # MAGIC
-# MAGIC Lets see if we can work out why
+# MAGIC There are a few different things that we can to fix this.
+# MAGIC First, langchain defaults to prompts tuned on OpenAI ChatGPT by default  
+# COMMAND ----------
+
+from langchain import PromptTemplate
+system_template = """<s>[INST] <<SYS>>
+As a helpful assistant, answer questions from users but be polite and concise. If you don't know say I don't know.
+<</SYS>>
+
+
+Based on the following context:
+
+{context}
+
+Answer the following question:
+{question}[/INST]
+"""
+
+# prompt templates in langchain need the input variables specified it can then be loaded in the string
+# Note that the names of the input_variables are particular to the chain type.
+prompt_template = PromptTemplate(
+    input_variables=["question", "context"], template=system_template
+)
+
+qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
+                                 retriever=docsearch.as_retriever(search_kwargs={"k": 3}),
+                                 chain_type_kwargs={"prompt": prompt_template})
+
+result = qa.run(query)
+print(result)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Note it can be hard to figure out how to override defaults in langchain.
+# MAGIC For example in this case, `RetrievalQA`` is of class `BaseRetrievalQA``. 
+# MAGIC `BaseRetrievalQA` is instantiated with `from_chain_type` in our case.
+# MAGIC Inside that method, we can see that `load_qa_chain` is the function that generates the chain.
+# MAGIC It is only by looking inside `load_qa_chain` can we work out the correct variable to use to override the prompt.
+# MAGIC All this of course can be explored only in the source code.
+# MAGIC
+# MAGIC We should also review results from our Chroma search. 
 # COMMAND ----------
 
 docsearch.similarity_search(query)
@@ -250,23 +292,13 @@ docsearch.similarity_search(query)
 # MAGIC Lets adjust the query so that we can "trigger" those keywords and embeddings.
 # COMMAND ----------
 
-query = 'Are large language models grounded in reality? if not what can we do?'
+query = 'What is text summurisation? How can it be useful?'
 docsearch.similarity_search(query)
 # COMMAND ----------
 
-
-
 # Test Query 2
+# Generic queries like this tend to do badly.
 query = "What are some key facts from this document?"
 qa.run(query)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC You can see that all the '\n' from the formatting is having an effect
-# MAGIC We haven't discussed it but developers have found that order of snippets
-# MAGIC can also have an effect. LLMs can be very sensitive to input
-
-
 
 # COMMAND ----------
