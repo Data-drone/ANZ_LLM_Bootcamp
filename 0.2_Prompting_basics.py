@@ -8,7 +8,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install ctransformers for CPU inference
-# MAGIC %pip install ctransformers==0.2.13
+# MAGIC %pip install ctransformers==0.2.16
 
 # COMMAND ----------
 
@@ -30,20 +30,16 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Building out prompts
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Basic Prompts
-# MAGIC Getting started is easy, we can send text in.
-# MAGIC Remember that different models will respond differently!
+# MAGIC # Prompting Techniques
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC # Basic Prompting
-# MAGIC
+# MAGIC Getting started is easy, we can send text in.
+# MAGIC Remember that different models will respond differently!
+# MAGIC The same model can also responds differently when we rerun a prompt
+# MAGIC (though you likely only see this with basic one line prompts)
 
 # COMMAND ----------
 
@@ -74,7 +70,8 @@ print(str_output)
 
 # MAGIC %md
 # MAGIC # Zero Shot Prompting
-# MAGIC
+# MAGIC Zero shot is the most basic way to ask something of the model.
+# MAGIC Just define your task and ask!
 
 # COMMAND ----------
 
@@ -90,55 +87,73 @@ print(str_output)
 
 # COMMAND ----------
 
-# DBTITLE 1,We restrict the max_new_tokens to just 3 (Positive/Negative/Neutral)
+# MAGIC %md
+# MAGIC You might have gotten some rubbish, we did the first time. (note models are stochastic) 
+# MAGIC And that is because our prompt is problematic.
+# MAGIC Different models have different "prompt templates" that they use.
+# MAGIC Let's try using the official one for Llama 2
+
+# COMMAND ----------
+
 prompt = """
-    Classify the text into neutral, negative or positive.
-    Text: I think the vacation is okay.
-    Sentiment:
+<s>[INST]<<SYS>>
+Classify the text into neutral, negative or positive.
+<</SYS>>    
+Text: 
+I think the vacation is okay.
+Sentiment:[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=3)
+output = pipe(prompt, max_new_tokens=5)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
 # COMMAND ----------
 
-prompt = """
-    Classify the text into neutral, negative or positive.
-    Text: I think the vacation sucks.
-    Sentiment:
-"""
-
-output = pipe(prompt, max_new_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
+# MAGIC %md llama 2 uses the [INST] tag to highlight the whole instruction
+# MAGIC <<SYS>> is the system prompt, the guide for the model on how to respond
+# MAGIC In our sample the user question comes after the Text: field
+# MAGIC you should get a better response after adopting this format.
 
 # COMMAND ----------
 
 prompt = """
-    What is the interest rate in following paragraph?
+<s>[INST]<<SYS>>
+Provide an answer to the question based on the following:
+<</SYS>>    
+The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
+
+User Question:
+What is the interest rate in following paragraph?
     
-    Text: The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
-    Interest Rate:
+[/INST]
 """
 
 output = pipe(prompt, max_new_tokens=60)
 str_output = string_printer(output, run_mode)
-str_output
+print(str_output)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC # Few Shot Prompting
+# MAGIC One way to help the a model do logic better is to provide it with samples
 # MAGIC
 
 # COMMAND ----------
 
 prompt = """
-    A consumer wants a savings account
-    A business wants a business account
-    A tech unicorn deserves a special VC account
-    What account would you recommend a small business?
+<s>[INST]<<SYS>>
+Be helpful and suggest a type of account for a customer.
+<</SYS>>    
+
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+Question:
+What account would you recommend a small business?[/INST]
 """
 
 output = pipe(prompt, max_new_tokens=15)
@@ -148,11 +163,17 @@ print(str_output)
 # COMMAND ----------
 
 prompt = """
-    A consumer wants a savings account
-    A business wants a business account
-    A tech unicorn deserves a special VC account
+<s>[INST]<<SYS>>
+Be helpful and suggest a type of account for a customer.
+<</SYS>>    
 
-    Question: What account would you recommend a consumer?
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+Question:
+What account would you recommend a bob the builder?[/INST]
 """
 
 output = pipe(prompt, max_new_tokens=15)
@@ -164,93 +185,152 @@ print(str_output)
 # MAGIC
 # MAGIC %md
 # MAGIC # Chain of Thought Prompting
-# MAGIC
+# MAGIC In chain of thought prompting, we show the model how to rationalise\
+# MAGIC This can help it deduce how to do a task properly
 
 # COMMAND ----------
 
-prompt = """
-    I went to the market and bought 10 apples. 
-    I gave 2 apples to the neighbor and 2 to the repairman. 
-    I then went and bought 5 more apples and ate 1. 
-    How many apples did I remain with?
-"""
-
-output = pipe(prompt, max_new_tokens=100)
-str_output = string_printer(output, run_mode)
-str_output
-
-
-# COMMAND ----------
-
-prompt = """
-    I went to the market and bought 10 apples. 
-    I gave 2 apples to the neighbor and 2 to the repairman. 
-    I then went and bought 5 more apples and ate 1. 
-    How many apples did I remain with?
-    Think through it step by step:
-
-"""
-
-output = pipe(prompt, max_new_tokens=100)
-str_output = string_printer(output, run_mode)
-str_output
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Constructing a system prompt
-# MAGIC
-
-# COMMAND ----------
-
-user_question = """
-    I have 20 cars.
-    I crashed 1 and sold 3 others.
-    I then went and bought 1 back.
-    How many cars do I have?
-"""
+# DBTITLE 1,Standard Prompt - we ask straight away
+user_question = """The cafeteria had 23 apples. If they used 20 to
+make lunch and bought 6 more, how many apples
+do they have?"""
 
 prompt = f"""
-    
-    Question:
-    I went to the market and bought 10 apples. 
-    I gave 2 apples to the neighbor and 2 to the repairman. 
-    I then went and bought 5 more apples and ate 1. 
-    How many apples did I remain with?
+<s>[INST]<<SYS>>
+Provide helpful responses and guide the customers. 
+<</SYS>>    
 
-    Answer:
-    I had 10 apples -2 for neighbor and -2 for repair man
-    10 - 2 - 2 = 6
-    I bought 5
-    6 + 5 = 11
-    and ate 1
-    11 - 1 = 10
-    So the answer is 10
-    
-    Based on the above answer the following question
+The follow example shows how to answer:
+Question:
+I went to the market and bought 10 apples. 
+I gave 2 apples to the neighbor and 2 to the repairman. 
+I then went and bought 5 more apples and ate 1. 
 
-    Question:
-    {user_question}
+Answer:
+The answer is 10
 
-    Think through it step by step:
+Based on the above provide the answer to the following question.
+Question:
+{user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=250)
+str_output = string_printer(output, run_mode)
+print(str_output)
+
+
+# COMMAND ----------
+
+# DBTITLE 1,Chain of Thought Prompt
+user_question = """The cafeteria had 23 apples. If they used 20 to
+make lunch and bought 6 more, how many apples
+do they have?"""
+
+prompt = f"""
+<s>[INST]<<SYS>>
+Provide helpful responses and guide the customers. 
+<</SYS>>    
+
+The follow example shows how to answer:
+Question:
+I went to the market and bought 10 apples. 
+I gave 2 apples to the neighbor and 2 to the repairman. 
+I then went and bought 5 more apples and ate 1. 
+
+Answer:
+We had 10 applies. We gave away 2 each to the neighbour and the repairman.
+10 - 2 - 2 = 6. We bought 5 and ate 1. 6+5-1=10 The answer is 10
+
+Based on the above provide the answer to the following question.
+Question:
+{user_question}[/INST]
+"""
+
+output = pipe(prompt, max_new_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Some models have specific prompts that they are trained on:
+# MAGIC # System Prompts
+# MAGIC Systems prompts can be used to instruct a model and also to tune it's reponse
+# MAGIC You have already seen them. It is the bit inside the <<SYS>> tags.
+# MAGIC They can have a big effect!
 # MAGIC
-# MAGIC ie Llama v3
+
+# COMMAND ----------
+
+system_prompt = 'Be helpful and suggest a type of account for a customer. try to be curteous and explain some of the key things to consider in bank account selection.'
+
+user_question = 'I am a single homeless bloke what account should I get?'
+
+prompt = f"""
+<s>[INST]<<SYS>>
+{system_prompt}
+<</SYS>>    
+
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+Question:
+{user_question}[/INST]
+"""
+
+output = pipe(prompt, max_new_tokens=15)
+str_output = string_printer(output, run_mode)
+print(str_output)
+
+
+# COMMAND ----------
+
+system_prompt = 'As a learned English Gentleman, be helpful and suggest a type of account for a customer. try to be curteous and explain in flowery language some of the key things to consider in bank account selection.'
+
+user_question = 'I am a single and jobless bloke what account suggest me a type of bank account?'
+
+prompt = f"""
+<s>[INST]<<SYS>>
+{system_prompt}
+<</SYS>>    
+
+Question:
+{user_question}[/INST]
+"""
+
+output = pipe(prompt, max_new_tokens=350)
+str_output = string_printer(output, run_mode)
+print(str_output)
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Prompt Formatting
+# MAGIC Prompt formats help to structure the prompts for different LLMs
+# MAGIC Each LLM could have a different standard
 # MAGIC
+# MAGIC Stanford Alpaca structure
+# MAGIC
+# MAGIC ```
 # MAGIC Below is an instruction that describes a task.
 # MAGIC Write a response that appropriately completes the request.
 # MAGIC ### Instruction:
-# MAGIC <user question>
+# MAGIC {user question}
 # MAGIC ### Response:
+# MAGIC ```
+# MAGIC
+# MAGIC llama v2 format
+# MAGIC ```
+# MAGIC <s>[INST] <<SYS>>
+# MAGIC You are a friendly assistant. Be Polite and concise.
+# MAGIC <</SYS>>
+# MAGIC
+# MAGIC Answer the following question:
+# MAGIC {user question}
+# MAGIC [/INST]
+# MAGIC ```
 
 # COMMAND ----------
 
@@ -266,28 +346,43 @@ print(str_output)
 
 # COMMAND ----------
 
-prompt = """
-    What happens to GNNs as you add layers?
+system_prompt = 'As a helpful long island librarian, answer the questions provided in a succint and eloquent way.'
+
+user_question = 'Explain to me like I am 5 LK-99'
+
+prompt = f"""
+<s>[INST]<<SYS>>
+{system_prompt}
+<</SYS>>    
+
+Question:
+{user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=100)
+output = pipe(prompt, max_new_tokens=512)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
 # COMMAND ----------
 
-user_question = 'What happens to GNNs as you add layers?'
+system_prompt = 'As a helpful long island librarian, answer the questions provided in a succint and eloquent way.'
+
+user_question = 'Explain to me like I am 5 LK-99'
 
 prompt = f"""
-    page context:
+<s>[INST]<<SYS>>
+{system_prompt}
+<</SYS>>    
 
-    Graph neural networks (GNNs), a type of neural network that can learn from graphstructured data and learn the representation of nodes through aggregating neighborhood information, have shown superior performance in various downstream tasks. However, it is known that the performance of GNNs degrades gradually as the number of layers increases. 
+Based on the below context:
 
-    Based on the page context, answer the following question.
-    Question: {user_question}
+LK-99 is a potential room-temperature superconductor with a gray‒black appearance.[2]: 8  It has a hexagonal structure slightly modified from lead‒apatite, by introducing small amounts of copper. A room-temperature superconductor is a material that is capable of exhibiting superconductivity at operating temperatures above 0 °C (273 K; 32 °F), that is, temperatures that can be reached and easily maintained in an everyday environment.
+
+Provide an answer to the following:
+{user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=50)
+output = pipe(prompt, max_new_tokens=512)
 str_output = string_printer(output, run_mode)
 print(str_output)
 

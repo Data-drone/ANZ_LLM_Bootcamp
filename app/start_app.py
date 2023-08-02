@@ -13,6 +13,12 @@
 import os
 
 # COMMAND ----------
+# creds
+import huggingface_hub
+
+huggingface_hub.login()
+
+# COMMAND ----------
 app_port = 7777
 os.environ['DB_APP_PORT'] = f'{app_port}'
 
@@ -26,12 +32,12 @@ proxy_prefix = f'dbc-dp-{org_id}.cloud.databricks.com'
 endpoint_url = f"https://{proxy_prefix}/driver-proxy/o/{org_id}/{cluster_id}/{app_port}/"
 print(f"Access this API at {endpoint_url}")
 
-
 # COMMAND ----------
 
 # DBTITLE 1,Basic Application
 
 # uncomment the latter for a basic app
+# This is just to experiment with starting an app
 #!uvicorn basic_app:app --host 0.0.0.0 --port $DB_APP_PORT
 
 # COMMAND ----------

@@ -10,7 +10,7 @@ import openai
 import os
 import torch
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig
 from transformers import StoppingCriteria, StoppingCriteriaList
 
 
@@ -33,20 +33,26 @@ def load_chain():
 
     # dolly works but isn't the best model
     #model_id = "databricks/dolly-v2-3b"
-    model_id = "mosaicml/mpt-7b-chat"
+    model_id = "meta-llama/Llama-2-7b-chat-hf"
+    model_revision = '01622a9d125d924bd828ab6c72c995d5eda92b8e'
     tokenizer = AutoTokenizer.from_pretrained(model_id)
 
-    stop_token_ids = tokenizer.convert_tokens_to_ids(["<|endoftext|>"])
+    model_config = AutoConfig.from_pretrained(model_id,
+                                          trust_remote_code=True, # this can be needed if we reload from cache
+                                          revision=model_revision
+                                      )
 
-    stopping_criteria = StoppingCriteriaList([StopOnTokens(stop_token_ids)])
-
-    model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto',
-                                               torch_dtype=torch.bfloat16,
-                                               trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(model_id,
+                                               revision=model_revision,
+                                               trust_remote_code=True, # this can be needed if we reload from cache
+                                               config=model_config,
+                                               device_map='auto',
+                                               torch_dtype=torch.bfloat16 # This will only work A10G / A100 and newer GPUs
+                                              )
 
     pipe = pipeline(
-        "text-generation", model=model, tokenizer=tokenizer, max_length = 4096,
-        stopping_criteria=stopping_criteria, repetition_penalty=1.1
+        "text-generation", model=model, tokenizer=tokenizer, max_length = 4000,
+        repetition_penalty=1.1, stream=True
         )
 
     llm = HuggingFacePipeline(pipeline=pipe)
