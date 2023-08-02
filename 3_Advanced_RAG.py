@@ -152,9 +152,6 @@ docsource = Chroma(collection_name=collection_name,
 
 # we can verify that our docsearch index has objects in it with this
 print('The index includes: {} documents'.format(docsource._collection.count()))
-
-
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -190,9 +187,52 @@ else:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Before we used `RetrievalQA` that doesn't have a concept of memory
+# MAGIC We can add in memory and use the `ConversationalRetrievalChain` Chain instead
+
+# COMMAND ----------
+
+# DBTITLE 1,Setting up prompt template
+from langchain import PromptTemplate
+system_template = """<s>[INST] <<SYS>>
+As a helpful assistant, answer questions from users but be polite and concise. If you don't know say I don't know.
+<</SYS>>
+
+
+Based on the following context:
+
+{context}
+
+Answer the following question:
+{question}[/INST]
+"""
+
+# prompt templates in langchain need the input variables specified it can then be loaded in the string
+# Note that the names of the input_variables are particular to the chain type.
+friendly_template = PromptTemplate(
+    input_variables=["question", "context"], template=system_template
+)
+
+# COMMAND ----------
+
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+from langchain import LLMChain
+
+memory = ConversationBufferMemory(memory_key="chat_history", output_key='answer')
+
 # Broken at the moment
-qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
-                                 retriever=docsource.as_retriever(search_kwargs={"k": 1}))
+memory_chain = ConversationalRetrievalChain.from_llm(llm=llm_model,
+                                                  retriever=docsource.as_retriever(search_kwargs={"k": 2}),
+                                                  chain_type='stuff',
+                                                  return_source_documents=True,
+                                                  output_key='answer',
+                                                  verbose=True,
+                                                  combine_docs_chain_kwargs={"prompt": friendly_template},
+                                                  memory=memory,
+                                                  get_chat_history=lambda h : h)
+
 
 # COMMAND ----------
 
@@ -215,16 +255,87 @@ query_embed
 
 docs = docsource.similarity_search_by_vector(query_embed)
 
-# Broken at the moment
-resp = qa({"query": query}, return_only_outputs=True)
-resp
-
 # COMMAND ----------
-# MAGIC %md NOTE setting k greater than 2?
+
+memory_chain({"question": query}, return_only_outputs=True)
+
 
 # COMMAND ----------
 
-# Broken at the moment
-qa.run(query)
+query = 'tell me more!'
+memory_chain({"question": query}, return_only_outputs=True)
 
 # COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Adding Human Feedback
+# MAGIC **EXPERIMENTAL**
+# MAGIC Now if only we could add in human in the loop reasoning and make the chain more intelligent that way
+# MAGIC
+# MAGIC We can try agents
+
+# COMMAND ----------
+
+# The conversation and memory doesn't occur at the retreival stage so lets use the old RetrievalQA
+from langchain import PromptTemplate
+system_template = """<s>[INST] <<SYS>>
+As a helpful assistant, answer questions from users but be polite and concise. If you don't know say I don't know.
+<</SYS>>
+
+
+Based on the following context:
+
+{context}
+
+Answer the following question:
+{question}[/INST]
+"""
+
+# prompt templates in langchain need the input variables specified it can then be loaded in the string
+# Note that the names of the input_variables are particular to the chain type.
+prompt_template = PromptTemplate(
+    input_variables=["question", "context"], template=system_template
+)
+
+qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
+                                 retriever=docsource.as_retriever(search_kwargs={"k": 3}),
+                                 chain_type_kwargs={"prompt": prompt_template})
+
+# COMMAND ----------
+
+from langchain.agents import Tool, load_tools
+
+# turn our qa chain into a tool
+retrieval_tool = Tool(
+    name = 'Document Search',
+    func = qa,
+    description ='this is a chain that has access to a cache of arxiv papers on deep learning and large language models'
+)
+
+tools = load_tools(
+    ["human"],
+    llm=llm_model,
+)
+
+tools.append(retrieval_tool)
+
+# COMMAND ----------
+
+# Setup agent
+from langchain.agents import initialize_agent, AgentType
+
+agent_chain = initialize_agent(
+    tools,
+    llm_model,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,
+)
+
+# Mileage may vary!!
+agent_chain.run("What should I ask you about llms?")
+
+
+
+
+
+
