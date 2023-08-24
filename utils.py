@@ -97,7 +97,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
                                               )
   
         pipe = pipeline(
-            "text-generation", model=model, tokenizer=tokenizer 
+            "text-generation", model=model, tokenizer=tokenizer, max_new_tokens=512 
         )
 
         return pipe
