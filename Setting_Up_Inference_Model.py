@@ -4,9 +4,7 @@
 
 # COMMAND ----------
 
-%pip install flash-attn
-%pip install git+https://github.com/HazyResearch/flash-attention.git#subdirectory=csrc/rotary
-
+%pip install -U bitsandbytes==0.40.0 transformers==4.31.0
 # COMMAND ----------
 
 dbutils.library.restartPython()
@@ -75,7 +73,7 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
                                                trust_remote_code=True, # this can be needed if we reload from cache
                                                config=model_config,
                                                device_map='auto',
-                                               torch_dtype=torch.bfloat16 # This will only work A10G / A100 and newer GPUs
+                                               load_in_8bit=True
                                               )
   
 pipe = pipeline(
@@ -118,7 +116,11 @@ with mlflow.start_run(run_name=run_name) as run:
                                   artifact_path=artifact_path,
                                   #signature=embedding_signature,
                                   input_example=example_sentences,
-                                  inference_config=inference_config
+                                  inference_config=inference_config,
+                                  pip_requirements={
+                                    'bitsandbytes==0.39.1',
+                                    'transformers==4.31.0'
+                                  }
                                   )
     
 # COMMAND ----------
