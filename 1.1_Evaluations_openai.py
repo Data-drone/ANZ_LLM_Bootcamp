@@ -7,11 +7,10 @@
 # MAGIC 
 # MAGIC We use an older llama_index to align with MLR 13.3 LTS Langchain version \
 # MAGIC as llama_index relies a lot on Langchain
-# MAGIC %pip install llama_index==0.6.36 ragas
 
 # COMMAND ----------
 
-%pip install llama_index==0.8.9 ragas
+%pip install llama_index==0.8.9
 
 # COMMAND ----------
 
@@ -27,7 +26,7 @@ dbutils.library.restartPython()
 # MAGIC
 # MAGIC Llama Index has a few key concepts we will use for this notebook:
 # MAGIC - Service Context - wrapper class to hold llm model / embeddings
-# MAGIC - An Index
+# MAGIC - An Index - this is the core of llama index. At it's base, an index consists of a complex structure of nodes which contain text and embeddings 
 
 # COMMAND ----------
 
@@ -35,16 +34,17 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# DBTITLE 1,Configurations
-run_mode = 'gpu' # or gpu
-test_pdf = f'{dbfs_source_docs}/2010.11934.pdf'
-test_pdf
-
+import os
+import openai
 
 # COMMAND ----------
 
-import os
-import openai
+# DBTITLE 1,Configurations
+test_pdf = f'{dbfs_source_docs}/2010.11934.pdf'
+test_pdf
+
+# COMMAND ----------
+
 # For this example we will use azure openai for now
 # Setup OpenAI Creds
 openai_key = dbutils.secrets.get(scope='brian_dl', key='dbdemos_openai')
@@ -64,11 +64,15 @@ deployment_name = 'dbdemo-gpt35'
 # MAGIC %md
 # MAGIC ## Setup Service Context
 # MAGIC By default, llama_index assumes that OpenAI is the service context \
-# MAGIC we will manually override these and create our own HF powered service_context
+# MAGIC We are using AzureOpen AI so the setup is a little different. \
+# MAGIC Azure OpenAI notably requires two deployments, an embedder and the model \
+# MAGIC We will demonstrate a hybrid setup here where we use a huggingface sentence transformer \
+# MAGIC that will do the embeddings for our vector store \
+# MAGIC Whilst AzureOpenAI (gpt-3.5-turbo) provides the brains
 
 # COMMAND ----------
 
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from llama_index import (
   ServiceContext,
   set_global_service_context,
@@ -84,14 +88,30 @@ embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-b
 
 ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
 
-llm = AzureChatOpenAI(deployment_name=deployment_name)
+# Azure OpenAI Embeddings - needed cause ragas uses async
+embedding_llm = LangchainEmbedding(
+    OpenAIEmbeddings(
+        model="text-embedding-ada-002",
+        deployment="dbdemos-embedding",
+        openai_api_key=openai_key,
+        openai_api_base=os.environ['OPENAI_API_BASE'],
+        openai_api_type=openai.api_type,
+        openai_api_version=os.environ['OPENAI_API_VERSION'],
+    ),
+    embed_batch_size=1,
+)
+
+# See: https://github.com/openai/openai-python/issues/318
+llm = AzureChatOpenAI(deployment_name=deployment_name,
+                      model_name="gpt-35-turbo")
+
 llm_predictor = LLMPredictor(llm=llm)
 
 llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 callback_manager = CallbackManager([llama_debug])
 
 service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=ll_embed,
+                                               embed_model=embedding_llm,
                                                callback_manager = callback_manager 
                                                )
 
@@ -102,8 +122,8 @@ set_global_service_context(service_context)
 
 # MAGIC %md
 # MAGIC # Load and Chunk Document
-# MAGIC we will load a sample doc to test on
-
+# MAGIC We will load a sample doc to test on, firstly with a naive default chunking strategy
+# MAGIC
 # COMMAND ----------
 
 # chunk the output
@@ -116,16 +136,17 @@ PDFReader = download_loader('PDFReader')
 loader = PDFReader()
 
 # This produces a list of llama_index document objects
-# ? 1 document per index?
 documents = loader.load_data(file=Path(test_pdf))
 
 # COMMAND ----------
 
+# we are just setting up a simple in memory Vectorstore here
 index = VectorStoreIndex.from_documents(documents)
 
+# and turning it into a query engine
 query_engine = index.as_query_engine()
 
-# Quick test
+# Let's validate that it is all working
 reply = query_engine.query('what is a neural network?')
 
 print(reply.response)
@@ -133,14 +154,67 @@ print(reply.response)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Build out evaluation
+# MAGIC # Build out evaluation Questions
+# MAGIC In order to run evaluation we need to have feasible questions to feed the model \
+# MAGIC It is time consuming to manually construct questions so we will use a LLM to do this \
+# MAGIC Note that this will have limitations, namely in the types of questions it will generate
 # COMMAND ----------
 
-from llama_index.evaluation import DatasetGenerator
+from llama_index.evaluation import DatasetGenerator, QueryResponseEvaluator
 
+# this is the question generator. Note that it has additional settings to customise prompt etc
 data_generator = DatasetGenerator.from_documents(documents=documents)
 
-# this takes 9 mins and gens approx 470
-question = data_generator.generate_questions_from_nodes()
+# this is the call to generate the questions
+eval_questions = data_generator.generate_questions_from_nodes()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Use Questions to generate evaluations
+# MAGIC Now we have our queries we need to run some responses
+# MAGIC
+# MAGIC This next step can be slow so we will cut it down to 20 questions \
+# MAGIC We can then use the `QueryResponseEvaluator`` looks at whether the query is answered by the response
+
+# COMMAND ----------
+
+import pandas as pd
+
+eval_questions = eval_questions[0:20]
+
+# Yes we are using a LLM to evaluate a LLM
+evaluator_azure_openai = QueryResponseEvaluator()
+
+# lets create and log the data properly
+results = []
+
+for question in eval_questions:
+    
+    engine_response = query_engine.query(question)
+    evaluation = evaluator_azure_openai.evaluate(question, engine_response)
+    results.append(
+      {
+        "query": question,
+        "response": str(engine_response.response),
+        "source": engine_response.source_nodes[0].node.text,
+        "evaluation": evaluation
+      }   
+    )
+
+# we will load it into a pandas frame: 
+response_df = pd.DataFrame(results)
+
+# Lets do a simple YES/NO evaluation
+evaluation_counts = response_df.groupby('evaluation').size().reset_index(name='Count')
+
+# COMMAND ----------
+
+# Let see what is in the frame
+response_df
+
+# COMMAND ----------
+
+evaluation_counts
 
 # COMMAND ----------
