@@ -11,7 +11,7 @@
 
 # COMMAND ----------
 
-%pip install llama_index==0.7.9 ragas
+%pip install llama_index==0.8.9 ragas
 
 # COMMAND ----------
 
@@ -60,8 +60,14 @@ huggingface_hub.login(token=huggingface_key)
 
 from langchain import HuggingFacePipeline
 from langchain.embeddings import HuggingFaceEmbeddings
-from llama_index import ServiceContext
+from llama_index import (
+  ServiceContext,
+  set_global_service_context
+)
 from llama_index.embeddings import LangchainEmbedding
+from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
+
+
 # To use a new model we need to wrap up a langchain object first
 try:
   llm_model
@@ -82,12 +88,19 @@ else:
 embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
                                    model_kwargs={'device': 'cpu'})
 
-ll_embed = LangchainEmbedding(langchain_embedding=embeddings)
+ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
 # COMMAND ----------
 
+llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+callback_manager = CallbackManager([llama_debug])
+
 service_context = ServiceContext.from_defaults(llm=llm_model, 
-                                               embed_model=ll_embed
+                                               embed_model=ll_embed,
+                                               callback_manager = callback_manager 
                                                )
+
+# we can now set this context to be a global default
+set_global_service_context(service_context)
 
 # COMMAND ----------
 
@@ -109,14 +122,6 @@ loader = PDFReader()
 # This produces a list of llama_index document objects
 # ? 1 document per index?
 documents = loader.load_data(file=Path(test_pdf))
-# COMMAND ----------
-
-# Apply a way to construct questions based on the input?
-type(documents)
-
-# COMMAND ----------
-
-# Need to create the service context and update the question template
 
 # COMMAND ----------
 
@@ -124,10 +129,62 @@ index = VectorStoreIndex.from_documents(documents, service_context=service_conte
 
 # COMMAND ----------
 
-query_engine = index.as_query_engine()
+from llama_index.prompts import PromptTemplate
+
+template = (
+    "<s>[INST] <<SYS>>We have provided context information below.<</SYS>> \n"
+    "---------------------\n"
+    "{context_str}"
+    "\n---------------------\n"
+    "Given this information, please answer the question: {query_str}\n"
+    "[/INST]"
+)
+qa_template = PromptTemplate(template)
 
 # COMMAND ----------
 
-query_engine.query('neural network')
+query_engine = index.as_query_engine(
+  text_qa_template=qa_template
+)
+
+# COMMAND ----------
+
+reply = query_engine.query('what is a neural network?')
+
+# COMMAND ----------
+
+reply.response
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Build out evaluation
+# COMMAND ----------
+
+from llama_index.evaluation import DatasetGenerator
+
+
+template = (
+    "<s>[INST] <<SYS>>You are a teacher / professor. Your task is to setup \
+      {num_questions_per_chunk} questions for an upcoming \
+        quiz/examination. The questions should be diverse in nather \
+          across the document. Restrict the questions to the \
+            context information provided<</SYS>> \n"
+    "---------------------\n"
+    "{context_str}"
+    "\n---------------------\n"
+    "Given this information, please answer the question: {query_str}\n"
+    "[/INST]"
+)
+qa_template = PromptTemplate(template)
+
+data_generator = DatasetGenerator.from_documents(documents=documents, 
+                                                 service_context=service_context,
+                                                 text_question_template=qa_template)
+
+# COMMAND ----------
+
+# this takes 9 mins and gens approx 470
+question = data_generator.generate_questions_from_nodes()
 
 # COMMAND ----------
