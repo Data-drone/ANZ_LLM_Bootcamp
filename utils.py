@@ -51,7 +51,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     run_mode (str) - can be gpu or cpu
     """
 
-    from transformers import pipeline, AutoConfig, GenerationConfig
+    from transformers import pipeline, AutoConfig
     import torch
 
     assert run_mode in ['cpu', 'gpu'], f'run_mode must be cpu or gpu not {run_mode}'
@@ -76,14 +76,14 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
         #model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
 
         cached_model = f'{bootcamp_dbfs_model_folder}/llama_2_gpu'
-        tokenizer = AutoTokenizer.from_pretrained(cached_model, cache_dir=dbfs_tmp_cache)
+        tokenizer = AutoTokenizer.from_pretrained(cached_model, cache_dir=dbfs_cache_dir)
         
         model_config = AutoConfig.from_pretrained(cached_model)
         model = AutoModelForCausalLM.from_pretrained(cached_model,
                                                config=model_config,
                                                device_map='auto',
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
-                                               cache_dir=dbfs_tmp_cache
+                                               cache_dir=dbfs_cache_dir
                                               )
     
         pipe = pipeline(
@@ -100,7 +100,5 @@ def string_printer(out_obj, run_mode):
   """
   Short convenience function because the output formats change between CPU and GPU
   """
-  if run_mode == 'cpu':
-    return out_obj
-  elif run_mode == 'gpu':
-    return out_obj[0]['generated_text']
+
+  return out_obj[0]['generated_text']

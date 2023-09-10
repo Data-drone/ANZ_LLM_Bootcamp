@@ -124,7 +124,7 @@ huggingface_hub.login(token=huggingface_key)
 from huggingface_hub import hf_hub_download, list_repo_files
 
 repo_list = {'llama_2_gpu': 'meta-llama/Llama-2-7b-chat-hf',
-             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGML'}
+             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGUF'}
 
 for lib_name in repo_list.keys():
     for name in list_repo_files(repo_list[lib_name]):

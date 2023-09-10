@@ -161,10 +161,7 @@ def string_printer(out_obj, run_mode):
   """
   Short convenience function because the output formats change between CPU and GPU
   """
-  if run_mode == 'cpu':
-    print(out_obj)
-  elif run_mode == 'gpu':
-    print(out_obj[0]['generated_text'])
+  print(out_obj[0]['generated_text'])
 
 # COMMAND ----------
 
