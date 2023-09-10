@@ -8,7 +8,11 @@
 
 # COMMAND ----------
 
-%pip install pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers scrapy
+%pip install -U pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers scrapy llama_index==0.8.9 opencv-python
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 # DBTITLE 1,Load Libs
@@ -24,8 +28,9 @@ import os
 
 # COMMAND ----------
 
-# source_doc_folder = f'/dbfs/bootcamp_data/pdf_data'
-sample_file_to_load = source_doc_folder + '/2302.07842.pdf'
+# source_doc_folder = f'/dbfs/bootcamp_data/pdf_data' if preloaded and shared
+# dbfs_source_docs - for personal lib
+sample_file_to_load = dbfs_source_docs + '/2010.11934.pdf'
 
 # COMMAND ----------
 
@@ -177,7 +182,7 @@ page_dict['blocks'][5]
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Advanced Parsing of PDFs
+# MAGIC # Advanced Parsing of PDFs
 # MAGIC We can try newer more advanced parsers instead of manual coding
 
 # MAGIC Unstructured seems to show some promise
@@ -186,7 +191,11 @@ page_dict['blocks'][5]
 
 # COMMAND ----------
 
-import unstructured
+# MAGIC %md
+# MAGIC ## Unstructured PDF Reader
+
+# COMMAND ----------
+
 from unstructured.partition.pdf import partition_pdf
 from collections import Counter
 
@@ -214,51 +223,97 @@ element_to_examine
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Parsing HTML
+# MAGIC # Using Unstructured with Llama Index
+# MAGIC
+# MAGIC Lets have a quick look at our different chunking methods and see how well they did
 
 # COMMAND ----------
 
-# Lets create a temp dir
-temp_scrape_dir = f'/tmp/{username}/web_scrape'
-dbutils.fs.mkdirs(temp_scrape_dir)
-dbfs_temp_scrape_dir = f'/dbfs{temp_scrape_dir}'
+# DBTITLE 1,Setting Up Service context
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.chat_models import AzureChatOpenAI
+import openai
+
+# Setup OpenAI Creds
+openai_key = dbutils.secrets.get(scope='brian_dl', key='dbdemos_openai')
+
+openai.api_type = "azure"
+#openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
+#openai.api_key = openai_key
+#openai.api_version = "2023-07-01-preview"
+os.environ['OPENAI_API_BASE'] = 'https://dbdemos-open-ai.openai.azure.com/'
+os.environ['OPENAI_API_KEY'] = openai_key
+os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
+
+deployment_name = 'dbdemo-gpt35'
+
+azure_openai_embedding = OpenAIEmbeddings(
+        model="text-embedding-ada-002",
+        deployment="dbdemos-embedding",
+        openai_api_key=openai_key,
+        openai_api_base=os.environ['OPENAI_API_BASE'],
+        openai_api_type=openai.api_type,
+        openai_api_version=os.environ['OPENAI_API_VERSION'],
+    )
+
+# See: https://github.com/openai/openai-python/issues/318
+llm = AzureChatOpenAI(deployment_name=deployment_name,
+                      model_name="gpt-35-turbo")
+
+from llama_index import (
+  ServiceContext,
+  set_global_service_context,
+  LLMPredictor
+)
+from llama_index.embeddings import LangchainEmbedding
+from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler
+
+
+# Azure OpenAI Embeddings - needed cause ragas uses async
+embedding_llm = LangchainEmbedding(
+    azure_openai_embedding,
+    embed_batch_size=1,
+)
+#ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
+
+
+llm_predictor = LLMPredictor(llm=llm)
+
+callback_handler = OpenInferenceCallbackHandler()
+callback_manager = CallbackManager([callback_handler])
+
+service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
+                                               embed_model=embedding_llm,
+                                               callback_manager = callback_manager 
+                                               )
+
+# we can now set this context to be a global default
+set_global_service_context(service_context)
+
 
 # COMMAND ----------
 
-# We will setup a Scrapy bot
-import scrapy 
-from scrapy.crawler import CrawlerProcess
+# DBTITLE 1,Data loaders
+from llama_index import download_loader, VectorStoreIndex
+from pathlib import Path
 
-class RAGSpider(scrapy.Spider):
-  name = 'skynet_spider'
-  allowed_domains = ['<>']
-  start_urls = ['<>']
-
-  custom_settings = {
-    'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'ITEM_PIPELINES': {
-      'scrapy.pipelines.files.FilePipeline': 1,
-    },
-    'FILES_STORE': dbfs_temp_scrape_dir,
-  }
-
-  def parse(self, response):
-    # Save the HTML page for the current URL
-    page_url = response.url.split('/')[-1]
-    with open(f'{dbfs_temp_scrape_dir}/{page_url}.html', 'wb') as f:
-      f.write(response.body)
-
-def run_spider():
-  process = CrawlerProcess(settings={
-    'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'CLOSESPIDER_PAGECOUNT': 1,
-  })
-  process.crawl(RAGSpider)
-  process.start()
-
-  process.stop()
-  return
+UnstructuredReader = download_loader("UnstructuredReader", refresh_cache=True, use_gpt_index_import=True)
+unstruct_loader = UnstructuredReader()
+unstructured_document = unstruct_loader.load_data(sample_file_to_load)
 
 # COMMAND ----------
 
-run_spider()
+# DBTITLE 1,Generate Index
+unstructured_index = VectorStoreIndex.from_documents(unstructured_document)
+unstructured_query = unstructured_index.as_query_engine()
+
+# COMMAND ----------
+
+# DBTITLE 1,Query
+question = 'what was the goal of mT5 and some the key challenges in building it?'
+unstructured_result = unstructured_query.query(question)
+
+# COMMAND ----------
+
+print(unstructured_result.response)
+
