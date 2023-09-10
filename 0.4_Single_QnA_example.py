@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pypdf sentence_transformers chromadb ctransformers
+# MAGIC %pip install pypdf sentence_transformers chromadb==0.3.29 ctransformers==0.0.26
 
 # COMMAND ----------
 
@@ -180,13 +180,8 @@ print(scores)
 try:
   llm_model
 except NameError:
-  if run_mode == 'cpu':
-    # the cTransformers class interfaces with langchain differently
-    from ctransformers.langchain import CTransformers
-    llm_model = CTransformers(model='TheBloke/Llama-2-7B-Chat-GGML', model_type='llama')
-  elif run_mode == 'gpu':
-    pipe = load_model(run_mode, dbfs_tmp_cache)
-    llm_model = HuggingFacePipeline(pipeline=pipe)
+  pipe = load_model(run_mode, dbfs_tmp_cache)
+  llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass
