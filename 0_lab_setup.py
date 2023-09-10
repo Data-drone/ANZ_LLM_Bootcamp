@@ -24,6 +24,7 @@ library_folder = dbfs_source_docs
 
 # When teaching a class
 class_lib = '/bootcamp_data/pdf_data'
+dbutils.fs.rm(class_lib, True)
 dbutils.fs.mkdirs(class_lib)
 library_folder = f'/dbfs{class_lib}'
 
@@ -77,27 +78,26 @@ dbutils.fs.ls(class_lib)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Setting up huggingface
-# MAGIC Lets try to cache a bunch of stuff and reload it elsewhere
+# MAGIC Setting up huggingface \
+# MAGIC Lets load the models that we need \
 # MAGIC Then we can save students having to wait for downloads or worry about tokens for HF
-     
-# COMMAND ----------
-
-%pip install ctransformers
-# COMMAND ----------
-
-dbutils.library.restartPython()
 
 # COMMAND ----------
 
 import os
 hf_home = '/bootcamp_data/hf_cache'
 transformers_cache = f'{hf_home}/transformers'
+download_dir = f'{hf_home}/downloads'
+
+dbutils.fs.rm(hf_home, True)
+
 dbutils.fs.mkdirs(hf_home)
 dbutils.fs.mkdirs(transformers_cache)
+dbutils.fs.mkdirs(download_dir)
 
 dbfs_hf_home = f'/dbfs{hf_home}'
 dbfs_transformers_home = f'/dbfs{transformers_cache}'
+dbfs_downloads_home = f'/dbfs{download_dir}'
 
 os.environ['TRANSFORMERS_CACHE'] = dbfs_transformers_home
 os.environ['HF_HOME'] = dbfs_hf_home
@@ -106,62 +106,37 @@ os.environ['HF_HOME'] = dbfs_hf_home
 
 %sh export TRANSFORMERS_CACHE=$dbfs_transformers_home
 
-
 # COMMAND ----------
 # this is needed for llama 2 downloading
 # You need to create a huggingface account
 # The follow the instructions here: https://huggingface.co/docs/hub/security-tokens#:~:text=To%20create%20an%20access%20token,you're%20ready%20to%20go!
-#  
+# we could also use notebook login
 
-from huggingface_hub import notebook_login
-notebook_login()
-# COMMAND ----------
+# we can use a secret to setup the huggingface connection
 
-# setting up ctransformers:
-
-from ctransformers.langchain import CTransformers
-model = 'TheBloke/open-llama-7B-v2-open-instruct-GGML'
-model = 'TheBloke/Llama-2-7B-Chat-GGML'
-llm_model = CTransformers(model=model, model_type='llama')
+import huggingface_hub
+huggingface_key = dbutils.secrets.get(scope='brian-hf', key='hf-key')
+huggingface_hub.login(token=huggingface_key)
 
 # COMMAND ----------
 
-# setting up gpu transformers
+# Lets use snapshot downloads
+from huggingface_hub import hf_hub_download, list_repo_files
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, pipeline
-import torch
+repo_list = {'llama_2_gpu': 'meta-llama/Llama-2-7b-chat-hf',
+             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGML'}
 
-#model_id = 'VMware/open-llama-7b-v2-open-instruct'
-#model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
-
-# you need to sign up on huggingface first
-model_id = 'meta-llama/Llama-2-7b-chat-hf'
-model_revision = '40c5e2b32261834431f89850c8d5359631ffa764'
-
-# note when on gpu then this will auto load to gpu
-# this will take approximately an extra 1GB of VRAM
-tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_transformers_home)
-
-model_config = AutoConfig.from_pretrained(model_id,
-                                  trust_remote_code=True, # this can be needed if we reload from cache
-                                  revision=model_revision
-                              )
-  
-# NOTE only A10G support `bfloat16` - g5 instances
-# V100 machines ie g4 need to use `float16`
-# device_map = `auto` moves the model to GPU if possible.
-# Note not all models support `auto`
-
-model = AutoModelForCausalLM.from_pretrained(model_id,
-                                       revision=model_revision,
-                                       trust_remote_code=True, # this can be needed if we reload from cache
-                                       config=model_config,
-                                       device_map='auto',
-                                       torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
-                                       cache_dir=dbfs_transformers_home
-                                      )
-  
-pipe = pipeline(
-    "text-generation", model=model, tokenizer=tokenizer 
-)
-
+for lib_name in repo_list.keys():
+    for name in list_repo_files(repo_list[lib_name]):
+        # skip all the safetensors data as we aren't using it and it's time consuming to download
+        if "safetensors" in name:
+            continue
+        target_path = os.path.join(dbfs_downloads_home, lib_name, name)
+        if not os.path.exists(target_path):
+            print(f"Downloading {name}")
+            hf_hub_download(
+                repo_list[lib_name],
+                filename=name,
+                local_dir=os.path.join(dbfs_downloads_home, lib_name),
+                local_dir_use_symlinks=False,
+            )
