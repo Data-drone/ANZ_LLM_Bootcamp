@@ -21,7 +21,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install ctransformers for CPU inference
-%pip install ctransformers==0.2.13
+%pip install ctransformers==0.2.26
 
 # COMMAND ----------
 
@@ -84,7 +84,7 @@ run_mode = 'cpu'
 
 # COMMAND ----------
 
-from transformers import AutoTokenizer, pipeline, AutoConfig, GenerationConfig
+from transformers import pipeline, AutoConfig
 import torch
 
 
@@ -93,34 +93,37 @@ if run_mode == 'cpu':
   ### Note that caching for TheBloke's models don't follow standard HuggingFace routine
   # You would need to `wget` then weights then use a model_path config instead.
   # See ctransformers docs for more info
-  from ctransformers import AutoModelForCausalLM
-  model_id = 'TheBloke/Llama-2-13B-chat-GGML'
+  from ctransformers import AutoModelForCausalLM, AutoTokenizer
+  model_id = 'llama_2_cpu/llama-2-7b-chat.Q4_K_M.gguf'
   #model_id = f''
-  pipe = AutoModelForCausalLM.from_pretrained(model_id,
-                                           model_type='llama')
+  model = AutoModelForCausalLM.from_pretrained(f'{bootcamp_dbfs_model_folder}/{model_id}',
+                                              hf=True, local_files_only=True)
+  tokenizer = AutoTokenizer.from_pretrained(model)
+
+  pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer 
+  )
 
 elif run_mode == 'gpu':
-  from transformers import AutoModelForCausalLM
+  from transformers import AutoModelForCausalLM, AutoTokenizer
+
+  # when loading from huggingface we need to set these
   model_id = 'meta-llama/Llama-2-7b-chat-hf'
   model_revision = '40c5e2b32261834431f89850c8d5359631ffa764'
 
   # note when on gpu then this will auto load to gpu
   # this will take approximately an extra 1GB of VRAM
-  tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
+  cached_model = f'{bootcamp_dbfs_model_folder}/llama_2_gpu'
+  tokenizer = AutoTokenizer.from_pretrained(cached_model, cache_dir=dbfs_tmp_cache)
 
-  model_config = AutoConfig.from_pretrained(model_id,
-                                          trust_remote_code=True, # this can be needed if we reload from cache
-                                          revision=model_revision
-                                      )
+  model_config = AutoConfig.from_pretrained(cached_model)
   
   # NOTE only A10G support `bfloat16` - g5 instances
   # V100 machines ie g4 need to use `float16`
   # device_map = `auto` moves the model to GPU if possible.
   # Note not all models support `auto`
 
-  model = AutoModelForCausalLM.from_pretrained(model_id,
-                                               revision=model_revision,
-                                               trust_remote_code=True, # this can be needed if we reload from cache
+  model = AutoModelForCausalLM.from_pretrained(cached_model,
                                                config=model_config,
                                                device_map='auto',
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs

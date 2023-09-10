@@ -7,6 +7,7 @@
 # COMMAND ----------
 
 # setup env
+# TODO - adjust and use bootcamp ones later
 import os
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
@@ -36,6 +37,10 @@ os.environ['PERSIST_DIR'] = linux_vector_store_directory
 
 # COMMAND ----------
 
+bootcamp_dbfs_model_folder = '/dbfs/bootcamp_data/hf_cache/downloads'
+
+# COMMAND ----------
+
 # MAGIC %md 
 # MAGIC Here we will make the model loaders into functions that receive the run_mode var
 
@@ -46,58 +51,43 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     run_mode (str) - can be gpu or cpu
     """
 
-    from transformers import AutoTokenizer, pipeline, AutoConfig, GenerationConfig
+    from transformers import pipeline, AutoConfig, GenerationConfig
     import torch
 
     assert run_mode in ['cpu', 'gpu'], f'run_mode must be cpu or gpu not {run_mode}'
 
     if run_mode == 'cpu':
 
-        ### Note that caching for TheBloke's models don't follow standard HuggingFace routine
-        # You would need to `wget` then weights then use a model_path config instead.
-        # See ctransformers docs for more info
-        from ctransformers import AutoModelForCausalLM
-        #model_id = 'TheBloke/open-llama-7B-v2-open-instruct-GGML'
-        model_id = 'TheBloke/Llama-2-13B-chat-GGML'
-        pipe = AutoModelForCausalLM.from_pretrained(model_id,
-                                           model_type='llama')
-        
-        return pipe
+      from ctransformers import AutoModelForCausalLM, AutoTokenizer
+      model_id = 'llama_2_cpu/llama-2-7b-chat.Q4_K_M.gguf'
+      model = AutoModelForCausalLM.from_pretrained(f'{bootcamp_dbfs_model_folder}/{model_id}',
+                                              hf=True, local_files_only=True)
+      tokenizer = AutoTokenizer.from_pretrained(model)
+
+      pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer 
+      )
+
+      return pipe
 
     elif run_mode == 'gpu':
-        from transformers import AutoModelForCausalLM
+        from transformers import AutoModelForCausalLM, AutoTokenizer
         #model_id = 'VMware/open-llama-7b-v2-open-instruct'
         #model_revision = 'b8fbe09571a71603ab517fe897a1281005060b62'
 
-        # you need to sign up on huggingface first
-        model_id = 'meta-llama/Llama-2-7b-chat-hf'
-        model_revision = '40c5e2b32261834431f89850c8d5359631ffa764'
+        cached_model = f'{bootcamp_dbfs_model_folder}/llama_2_gpu'
+        tokenizer = AutoTokenizer.from_pretrained(cached_model, cache_dir=dbfs_tmp_cache)
         
-        # note when on gpu then this will auto load to gpu
-        # this will take approximately an extra 1GB of VRAM
-        tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_cache_dir)
-
-        model_config = AutoConfig.from_pretrained(model_id,
-                                          trust_remote_code=True, # this can be needed if we reload from cache
-                                          revision=model_revision
-                                      )
-  
-        # NOTE only A10G support `bfloat16` - g5 instances
-        # V100 machines ie g4 need to use `float16`
-        # device_map = `auto` moves the model to GPU if possible.
-        # Note not all models support `auto`
-
-        model = AutoModelForCausalLM.from_pretrained(model_id,
-                                               revision=model_revision,
-                                               trust_remote_code=True, # this can be needed if we reload from cache
+        model_config = AutoConfig.from_pretrained(cached_model)
+        model = AutoModelForCausalLM.from_pretrained(cached_model,
                                                config=model_config,
                                                device_map='auto',
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
-                                               cache_dir=dbfs_cache_dir
+                                               cache_dir=dbfs_tmp_cache
                                               )
-  
+    
         pipe = pipeline(
-            "text-generation", model=model, tokenizer=tokenizer, max_new_tokens=512 
+            "text-generation", model=model, tokenizer=tokenizer, max_new_tokens=128 
         )
 
         return pipe

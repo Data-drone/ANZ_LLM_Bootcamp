@@ -9,27 +9,17 @@
 # COMMAND ----------
 
 dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Setup
+# MAGIC %run ./utils
+
 # COMMAND ----------
 
 import faiss
 import wikipedia
 import os
-
-# COMMAND ----------
-
-username = spark.sql("SELECT current_user()").first()['current_user()']
-os.environ['USERNAME'] = username
-
-tmp_user_folder = f'/tmp/{username}'
-dbutils.fs.mkdirs(tmp_user_folder)
-dbfs_tmp_dir = f'/dbfs{tmp_user_folder}'
-os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
-
-# setting up transformers cache
-cache_dir = f'{tmp_user_folder}/.cache'
-dbutils.fs.mkdirs(cache_dir)
-dbfs_tmp_cache = f'/dbfs{cache_dir}'
-os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
 
 # COMMAND ----------
 

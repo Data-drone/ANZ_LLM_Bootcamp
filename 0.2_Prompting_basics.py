@@ -8,7 +8,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install ctransformers for CPU inference
-# MAGIC %pip install ctransformers==0.2.16
+# MAGIC %pip install ctransformers==0.2.26
 
 # COMMAND ----------
 
