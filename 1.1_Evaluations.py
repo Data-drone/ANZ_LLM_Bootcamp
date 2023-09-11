@@ -83,12 +83,6 @@ from llama_index.embeddings import LangchainEmbedding
 from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
 from langchain.chat_models import AzureChatOpenAI
 
-# Azure OpenAi doesn't have an embedding set as standard so we will use that
-embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
-                                   model_kwargs={'device': 'cpu'})
-
-ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
-
 # Azure OpenAI Embeddings - needed cause ragas uses async
 embedding_llm = LangchainEmbedding(
     OpenAIEmbeddings(
