@@ -69,6 +69,7 @@ from llama_index import SimpleDirectoryReader, download_loader
 UnstructuredReader = download_loader("UnstructuredReader", refresh_cache=True, use_gpt_index_import=True)
 unstruct_loader = UnstructuredReader()
 
+dbfs_source_docs = '/bootcamp_data/pdf_data'
 print(f'loading documents from: {dbfs_source_docs}')
 documents = SimpleDirectoryReader(
     input_dir=dbfs_source_docs,

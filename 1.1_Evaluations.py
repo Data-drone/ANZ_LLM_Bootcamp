@@ -40,7 +40,8 @@ import openai
 # COMMAND ----------
 
 # DBTITLE 1,Configurations
-test_pdf = f'{dbfs_source_docs}/2010.11934.pdf'
+test_pdf = f'/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
+#test_pdf = f'{dbfs_source_docs}/2302.09419.pdf'
 test_pdf
 
 # COMMAND ----------

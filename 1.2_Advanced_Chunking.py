@@ -30,7 +30,8 @@ import os
 
 # source_doc_folder = f'/dbfs/bootcamp_data/pdf_data' if preloaded and shared
 # dbfs_source_docs - for personal lib
-sample_file_to_load = dbfs_source_docs + '/2010.11934.pdf'
+#sample_file_to_load = dbfs_source_docs + '/2302.09419.pdf'
+sample_file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
 
 # COMMAND ----------
 

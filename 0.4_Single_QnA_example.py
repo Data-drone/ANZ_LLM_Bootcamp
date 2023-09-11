@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pypdf sentence_transformers chromadb==0.3.29 ctransformers==0.0.26
+# MAGIC %pip install pypdf sentence_transformers chromadb==0.3.29 ctransformers==0.2.26
 
 # COMMAND ----------
 
@@ -53,8 +53,8 @@ run_mode = 'cpu' # 'gpu'
 # for a class 
 
 # https://arxiv.org/pdf/2204.01691.pdf
-#file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
-file_to_load = '/dbfs' + source_doc_folder + '/2302.09419.pdf'
+file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
+#file_to_load = '/dbfs' + source_doc_folder + '/2302.09419.pdf'
 file_path = 'https://arxiv.org/pdf/2302.09419.pdf'
 
 loader = PyPDFLoader(file_to_load)
