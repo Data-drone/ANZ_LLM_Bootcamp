@@ -19,12 +19,16 @@ import requests
 # We will setup a folder to store the files
 user_agent = "me-me-me"
 
+reset_home = False 
+
 # If running this on your own in multiuser environment then use this
 library_folder = dbfs_source_docs
 
 # When teaching a class
 class_lib = '/bootcamp_data/pdf_data'
-dbutils.fs.rm(class_lib, True)
+
+if reset_home = True:
+    dbutils.fs.rm(class_lib, True)
 dbutils.fs.mkdirs(class_lib)
 library_folder = f'/dbfs{class_lib}'
 
@@ -89,7 +93,8 @@ hf_home = '/bootcamp_data/hf_cache'
 transformers_cache = f'{hf_home}/transformers'
 download_dir = f'{hf_home}/downloads'
 
-dbutils.fs.rm(hf_home, True)
+if reset_home = True
+    dbutils.fs.rm(hf_home, True)
 
 dbutils.fs.mkdirs(hf_home)
 dbutils.fs.mkdirs(transformers_cache)
@@ -115,6 +120,11 @@ os.environ['HF_HOME'] = dbfs_hf_home
 # we can use a secret to setup the huggingface connection
 
 import huggingface_hub
+
+# use this if you are logging in when doing lab setup
+# huggingface_hub.notebook_login()
+
+# use this if you have a hf key saved in secrets
 huggingface_key = dbutils.secrets.get(scope='brian-hf', key='hf-key')
 huggingface_hub.login(token=huggingface_key)
 
