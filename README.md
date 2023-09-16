@@ -23,6 +23,14 @@ The other notebooks are works in progress.
 
 It is possible to run applications on the driver node in Databricks. The `app` folder contains examples of how to do this. 
 
+## Recordings
+
+To view these materials presented in a webinar see:
+
+[LLM Basics](https://vimeo.com/857791352) 0.x_ materials
+[LLM Advanced](https://vimeo.com/862303088) 1.x_ materials
+
+
 ## Further Reading and Learnings
 - We have a great catalog of LLM related talks at the Data and AI Summit [link here](https://www.databricks.com/dataaisummit/llm/)
 - For a set of great examples on fine-tuning these LLMs, we recommend looking at [the Databricks ML examples repo](https://github.com/databricks/databricks-ml-examples/tree/master)
