@@ -244,13 +244,13 @@ openai.api_type = "azure"
 #openai.api_version = "2023-07-01-preview"
 os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
 os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2022-12-01"
+os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
 
 deployment_name = 'daiwt-demo'
 
 azure_openai_embedding = OpenAIEmbeddings(
         model="text-embedding-ada-002",
-        deployment="dbdemos-embedding",
+        deployment="daiwt-demo-embedding",
         openai_api_key=openai_key,
         openai_api_base=os.environ['OPENAI_API_BASE'],
         openai_api_type=openai.api_type,

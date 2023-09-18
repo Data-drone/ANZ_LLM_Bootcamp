@@ -56,7 +56,7 @@ openai.api_type = "azure"
 #openai.api_version = "2023-07-01-preview"
 os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
 os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2022-12-01"
+os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
 
 deployment_name = 'daiwt-demo'
 
