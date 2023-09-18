@@ -27,7 +27,7 @@ library_folder = dbfs_source_docs
 # When teaching a class
 class_lib = '/bootcamp_data/pdf_data'
 
-if reset_home = True:
+if reset_home == True:
     dbutils.fs.rm(class_lib, True)
 dbutils.fs.mkdirs(class_lib)
 library_folder = f'/dbfs{class_lib}'
@@ -93,7 +93,7 @@ hf_home = '/bootcamp_data/hf_cache'
 transformers_cache = f'{hf_home}/transformers'
 download_dir = f'{hf_home}/downloads'
 
-if reset_home = True
+if reset_home == True:
     dbutils.fs.rm(hf_home, True)
 
 dbutils.fs.mkdirs(hf_home)
