@@ -48,17 +48,17 @@ test_pdf
 
 # For this example we will use azure openai for now
 # Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='brian_dl', key='dbdemos_openai')
+openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
 
 openai.api_type = "azure"
 #openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
 #openai.api_key = openai_key
 #openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://dbdemos-open-ai.openai.azure.com/'
+os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
 os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
+os.environ['OPENAI_API_VERSION'] = "2022-12-01"
 
-deployment_name = 'dbdemo-gpt35'
+deployment_name = 'daiwt-demo'
 
 # COMMAND ----------
 
@@ -87,7 +87,7 @@ from langchain.chat_models import AzureChatOpenAI
 embedding_llm = LangchainEmbedding(
     OpenAIEmbeddings(
         model="text-embedding-ada-002",
-        deployment="dbdemos-embedding",
+        deployment="daiwt-demo-embedding",
         openai_api_key=openai_key,
         openai_api_base=os.environ['OPENAI_API_BASE'],
         openai_api_type=openai.api_type,

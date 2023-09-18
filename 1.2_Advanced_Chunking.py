@@ -236,17 +236,17 @@ from langchain.chat_models import AzureChatOpenAI
 import openai
 
 # Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='brian_dl', key='dbdemos_openai')
+openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
 
 openai.api_type = "azure"
 #openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
 #openai.api_key = openai_key
 #openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://dbdemos-open-ai.openai.azure.com/'
+os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
 os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
+os.environ['OPENAI_API_VERSION'] = "2022-12-01"
 
-deployment_name = 'dbdemo-gpt35'
+deployment_name = 'daiwt-demo'
 
 azure_openai_embedding = OpenAIEmbeddings(
         model="text-embedding-ada-002",

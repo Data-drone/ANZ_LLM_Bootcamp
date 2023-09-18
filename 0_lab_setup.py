@@ -125,7 +125,7 @@ import huggingface_hub
 # huggingface_hub.notebook_login()
 
 # use this if you have a hf key saved in secrets
-huggingface_key = dbutils.secrets.get(scope='brian-hf', key='hf-key')
+huggingface_key = dbutils.secrets.get(scope='bootcamp_training', key='hf-key')
 huggingface_hub.login(token=huggingface_key)
 
 # COMMAND ----------
