@@ -201,7 +201,13 @@ hover_data =  pd.DataFrame({'index': np.arange(len(example_sentences)) ,
 plot.output_notebook()
 # COMMAND ----------
 
-p = plot.interactive(proj_2d, hover_data=hover_data, point_size=10)
+# MAGIC %md
+# MAGIC We can now visualise the data, note that we don't have a lot of datapoints \
+# MAGIC so there aren't any obvious patterns in these but as you add more points patterns should appear
+# COMMAND ----------
+
+# hover_data=hover_data,
+p = plot.interactive(proj_2d,  point_size=10)
 html = file_html(p, CDN, "Sample Sentences")
 displayHTML(html)
 
@@ -306,14 +312,15 @@ proj_2d = umap_2d.fit(vector_chunks)
 hover_data =  pd.DataFrame({'index': np.arange(len(text_obj)) ,
                           'text': text_obj})
 
-p = plot.interactive(proj_2d, hover_data=hover_data, point_size=10)
+# hover_data=hover_data,
+p = plot.interactive(proj_2d,  point_size=10)
 html = file_html(p, CDN, "Research Doc")
 displayHTML(html)
 
 
 # COMMAND ----------
 
-# BIER and compare embeddings?
+# MAGIC TODO BIER comparison of embedding algorithms
 
 # COMMAND ----------
 
@@ -335,7 +342,8 @@ eval_questions = data_generator.generate_questions_from_nodes()
 
 # MAGIC %md
 # MAGIC # (WIP) Create Phoenix Visualisations
-# MAGIC The phoenix app still needs updating with support for different root_paths first
+# MAGIC TODO We are working with the Arize team to make Phoenix work \
+# MAGIC till that happens this code will not be of use for now
 
 # COMMAND ----------
 
