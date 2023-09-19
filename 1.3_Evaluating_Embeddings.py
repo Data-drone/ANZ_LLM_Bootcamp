@@ -6,8 +6,8 @@
 # MAGIC for more info see: https://docs.arize.com/phoenix/
 
 # COMMAND ----------
-
-%pip install -U llama_index==0.8.9 "arize-phoenix[experimental]" pandas==1.5.3 faiss-cpu datashader bokeh holoviews scikit-image colorcet
+# MAGIC # "arize-phoenix[experimental]"  pandas==1.5.3
+# MAGIC %pip install -U llama_index==0.8.9 langchain==0.0.284 faiss-cpu datashader bokeh holoviews scikit-image colorcet
 
 # COMMAND ----------
 

@@ -10,12 +10,15 @@
 
 # COMMAND ----------
 
-%pip install llama_index==0.8.9
+%pip install llama_index==0.8.9 langchain==0.0.284
 
 # COMMAND ----------
 
 dbutils.library.restartPython()
 
+# COMMAND ----------
+
+%autoawait asyncio
 # COMMAND ----------
 
 # MAGIC %md

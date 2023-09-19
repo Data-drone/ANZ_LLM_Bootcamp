@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-%pip install -U pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers scrapy llama_index==0.8.9 opencv-python
+%pip install -U pymupdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils ctransformers scrapy llama_index==0.8.9 langchain==0.0.284 opencv-python
 
 # COMMAND ----------
 
