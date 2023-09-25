@@ -3,7 +3,7 @@
 # MAGIC # Evaluations
 # MAGIC Running Evaluations on RAGs is still more art than science \
 # MAGIC We will use llama_index to assist in generating evaluation questions \
-# MAGIC And the ragas library for generating metrics to assess your RAG \
+# MAGIC And use the inbuilt assessment prompt in llama_index \
 # MAGIC 
 # MAGIC We use an older llama_index to align with MLR 13.3 LTS Langchain version \
 # MAGIC as llama_index relies a lot on Langchain

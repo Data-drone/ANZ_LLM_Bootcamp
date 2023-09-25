@@ -2,8 +2,13 @@
 # MAGIC %md
 # MAGIC # Understanding Embeddings
 # MAGIC Embeddings are just vectors and we can visualise and analyse them as such \
-# MAGIC In this case we will use the Arize Phoenix tool \
-# MAGIC for more info see: https://docs.arize.com/phoenix/
+# MAGIC A common way to look at and explore embeddings is to use TSNE visualisations. \
+# MAGIC This can be applied to our VectorDB Data too.
+# MAGIC
+# MAGIC See: https://www.kaggle.com/code/colinmorris/visualizing-embeddings-with-t-sne
+# MAGIC
+# MAGIC An open source tool that you might want to investigate for this as well is Arize Phoenix \
+# MAGIC See: https://docs.arize.com/phoenix/
 
 # COMMAND ----------
 # MAGIC # "arize-phoenix[experimental]"  pandas==1.5.3

@@ -6,7 +6,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Extra Libs to install
-%pip install pypdf ctransformers unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.9 langchain==0.0.284 opencv-python chromadb==0.4.9
+%pip install pypdf ctransformers==0.2.26 unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.9 langchain==0.0.284 opencv-python chromadb==0.4.9
 
 # COMMAND ----------
 

@@ -7,12 +7,12 @@
 # MAGIC
 # MAGIC In these exercises we will focus on the _transformers_ library but _datasets_, _evaluate_ and _accelerate_ are commonly used in training models. 
 # MAGIC
-# MAGIC All code here is tested on MLR 13.2 on a g5 AWS instance (A10G GPU).
+# MAGIC All code here is tested on MLR 13.3 LTS on a g5 AWS instance (A10G GPU) and also on m5.4xlarge for CPU version.
 # MAGIC We suggest a ```g5.4xlarge``` single node cluster to start
 # MAGIC The Azure equivalent is ```NC6s_v3``` series. However, for this lab we will be using ```g5.4xlarge``` instances.
 # MAGIC ----
 # MAGIC **Notes**
-# MAGIC - Falcon requires Torch 2.0 coming soon....
+# MAGIC - Falcon requires Torch 2.0 which is available in MLR 14.x
 # MAGIC - The LLM Space is fast moving. Many models are provided by independent companies as well so model revision and pinning library versions is important.
 # MAGIC - If using an MLR prior to 13.2, you will need to run ```%pip install einops```
 # MAGIC - It may also be necessary to manually install extra Nvidia libraries via [init_scripts](https://docs.databricks.com/clusters/init-scripts.html)
