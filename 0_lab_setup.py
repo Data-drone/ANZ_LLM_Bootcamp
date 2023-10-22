@@ -143,7 +143,10 @@ for lib_name in repo_list.keys():
     for name in list_repo_files(repo_list[lib_name]):
         # skip all the safetensors data as we aren't using it and it's time consuming to download
         if "safetensors" in name:
-            continue
+            if lib_name in ['llama_2_awq', 'llama_2_13b_awq', 'vicuna_1.5_13b_awq']:
+                pass
+            else:
+                continue
         target_path = os.path.join(dbfs_downloads_home, lib_name, name)
         if not os.path.exists(target_path):
             print(f"Downloading {name}")
