@@ -134,5 +134,10 @@ def string_printer(out_obj, run_mode):
   """
   Short convenience function because the output formats change between CPU and GPU
   """
+  if run_mode in ['cpu', 'gpu']:
 
-  return out_obj[0]['generated_text']
+    return out_obj[0]['generated_text']
+  
+  elif run_mode == 'serving':
+    
+    return  out_obj['predictions']

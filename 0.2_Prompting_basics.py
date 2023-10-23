@@ -16,7 +16,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-run_mode = 'cpu' # or gpu
+run_mode = 'serving' # or gpu or cpu
 
 # COMMAND ----------
 
@@ -44,14 +44,14 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 # COMMAND ----------
 
 prompt = "The sky is"
-output = pipe(prompt, max_new_tokens=100)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
 # COMMAND ----------
 
 prompt = "Knock Knock"
-output = pipe(prompt, max_new_tokens=100)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -62,7 +62,7 @@ prompt = """
     Who's there?
     """
 
-output = pipe(prompt, max_new_tokens=10)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -81,7 +81,7 @@ prompt = """
     Sentiment:
 """
 
-output = pipe(prompt, max_new_tokens=20)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -104,7 +104,7 @@ I think the vacation is okay.
 Sentiment:[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=5)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -129,7 +129,7 @@ What is the interest rate in following paragraph?
 [/INST]
 """
 
-output = pipe(prompt, max_new_tokens=60)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -156,7 +156,7 @@ Question:
 What account would you recommend a small business?[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -176,7 +176,7 @@ Question:
 What account would you recommend a bob the builder?[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -214,7 +214,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=250)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -246,7 +246,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=250)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -279,7 +279,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -299,7 +299,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=350)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -359,7 +359,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=512)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -382,7 +382,7 @@ Provide an answer to the following:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=512)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
