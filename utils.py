@@ -9,6 +9,7 @@
 # setup env
 # TODO - adjust and use bootcamp ones later
 import os
+import requests
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -46,6 +47,27 @@ bootcamp_dbfs_model_folder = '/dbfs/bootcamp_data/hf_cache/downloads'
 
 # COMMAND ----------
 
+class QueryEndpoint:
+    """
+    A class designed to be interchangeable with pipe but calls databricks model serving instead
+    """
+   
+    def __init__(self, uri:str, token:str):
+      
+      self.uri = uri
+      self.header = {"Context-Type": "text/json", "Authorization": f"Bearer {token}"}
+
+
+    def __call__(self, prompt: list[str], **kwargs):
+       
+      dataset = {'inputs': {'prompt': prompt},
+                  'params': kwargs}
+
+      response = requests.post(headers=self.header, url=self.uri, json=dataset)
+
+      return response.json()
+# COMMAND ----------
+
 def load_model(run_mode: str, dbfs_cache_dir: str):
     """
     run_mode (str) - can be gpu or cpu
@@ -54,7 +76,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     from transformers import pipeline, AutoConfig
     import torch
 
-    assert run_mode in ['cpu', 'gpu'], f'run_mode must be cpu or gpu not {run_mode}'
+    assert run_mode in ['cpu', 'gpu', 'serving'], f'run_mode must be cpu, gpu or serving not {run_mode}'
 
     if run_mode == 'cpu':
 
@@ -92,6 +114,18 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
 
         return pipe
     
+    elif run_mode == 'serving':
+        
+        endpoint_name = 'llama_2_endpoint'
+
+        browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+        db_host = f"https://{browser_host}"
+        model_uri = f"{db_host}/serving-endpoints/{endpoint_name}/invocations"
+        db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+
+        test_pipe = QueryEndpoint(model_uri, db_token)
+
+        return test_pipe
 
 # COMMAND ----------
 
