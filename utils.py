@@ -10,6 +10,7 @@
 # TODO - adjust and use bootcamp ones later
 import os
 import requests
+import pprint
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -68,7 +69,7 @@ class QueryEndpoint:
       return response.json()
 # COMMAND ----------
 
-def load_model(run_mode: str, dbfs_cache_dir: str):
+def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_endpoint'):
     """
     run_mode (str) - can be gpu or cpu
     """
@@ -116,11 +117,9 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     
     elif run_mode == 'serving':
         
-        endpoint_name = 'llama_2_endpoint'
-
         browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
         db_host = f"https://{browser_host}"
-        model_uri = f"{db_host}/serving-endpoints/{endpoint_name}/invocations"
+        model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
         db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
         test_pipe = QueryEndpoint(model_uri, db_token)
@@ -134,10 +133,14 @@ def string_printer(out_obj, run_mode):
   """
   Short convenience function because the output formats change between CPU and GPU
   """
-  if run_mode in ['cpu', 'gpu']:
+  try:
+    if run_mode in ['cpu', 'gpu']:
 
-    return out_obj[0]['generated_text']
+      return pprint.pprint(out_obj[0]['generated_text'], indent=2)
   
-  elif run_mode == 'serving':
+    elif run_mode == 'serving':
     
-    return  out_obj['predictions']
+      return  pprint.pprint(out_obj['predictions'], indent=2)
+  
+  except KeyError:
+    pprint.pprint(out_obj, indent=2)
