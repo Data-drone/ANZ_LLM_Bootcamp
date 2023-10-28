@@ -57,6 +57,7 @@ class QueryEndpoint:
       
       self.uri = uri
       self.header = {"Context-Type": "text/json", "Authorization": f"Bearer {token}"}
+      print(uri)
 
 
     def __call__(self, prompt: list[str], **kwargs):
@@ -69,7 +70,7 @@ class QueryEndpoint:
       return response.json()
 # COMMAND ----------
 
-def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_endpoint'):
+def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b'):
     """
     run_mode (str) - can be gpu or cpu
     """

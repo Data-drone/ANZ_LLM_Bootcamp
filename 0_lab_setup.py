@@ -139,7 +139,10 @@ repo_list = {'llama_2_gpu': 'meta-llama/Llama-2-7b-chat-hf',
              'llama_2_13b': 'meta-llama/Llama-2-13b-chat-hf',
              'llama_2_13b_awq': 'TheBloke/Llama-2-13B-chat-AWQ',
              'vicuna_1.5_13b': 'lmsys/vicuna-13b-v1.5',
-             'vicuna_1.5_13b_awq': 'TheBloke/vicuna-13B-v1.5-16K-AWQ'} #,
+             'vicuna_1.5_13b_awq': 'TheBloke/vicuna-13B-v1.5-16K-AWQ',
+             'mistral_7b_instruct': 'mistralai/Mistral-7B-Instruct-v0.1',
+             'mistral_7b': 'mistralai/Mistral-7B-v0.1',
+             'zephyr_7b': 'HuggingFaceH4/zephyr-7b-beta'} #,
              #'llama_2_70b': 'meta-llama/Llama-2-70b-chat-hf'}
 
 for lib_name in repo_list.keys():
