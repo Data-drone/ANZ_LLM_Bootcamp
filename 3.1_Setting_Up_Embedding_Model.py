@@ -12,6 +12,7 @@ username = spark.sql("SELECT current_user()").first()['current_user()']
 model_name='sentence-transformers/all-mpnet-base-v2'
 
 # UC Catalog Settings
+use_uc = True
 catalog = 'brian_ml'
 db = 'rag_chatbot'
 uc_model_name = 'hf_embedding_model'
@@ -51,7 +52,8 @@ example_sentences = ["welcome to sentence transformers",
 
 # DBTITLE 1,Setting Up the mlflow experiment
 #Enable Unity Catalog with mlflow registry
-mlflow.set_registry_uri('databricks-uc')
+if use_uc:
+  mlflow.set_registry_uri('databricks-uc')
 
 try:
   mlflow.create_experiment(experiment_name)
@@ -77,11 +79,17 @@ with mlflow.start_run(run_name=run_name) as run:
 
 # DBTITLE 1,Register Model
 
+# /Users/odl_instructor_685544@databrickslabs.com/rag_llm_embedding
 # We need to know the Run id first. When running this straight then we can extract the run_id
-latest_model = mlflow.register_model(f'runs:/{run.info.run_id}/{artifact_path}', 
-                                     f"{catalog}.{db}.{uc_model_name}")
+if use_uc:
+   model_path = f"{catalog}.{db}.{uc_model_name}"
+else:
+   model_path = uc_model_name
 
-client.set_registered_model_alias(name=f"{catalog}.{db}.{uc_model_name}", 
+latest_model = mlflow.register_model(f'runs:/{run.info.run_id}/{artifact_path}', 
+                                     model_path)
+
+client.set_registered_model_alias(name=model_path, 
                                   alias="prod", 
                                   version=latest_model.version)
 
@@ -99,7 +107,7 @@ serving_client = EndpointApiClient()
 # Start the enpoint using the REST API (you can do it using the UI directly)
 
 serving_client.create_endpoint_if_not_exists(endpoint_name, 
-                                            model_name=f"{catalog}.{db}.{uc_model_name}", 
+                                            model_name=model_path, 
                                             model_version = latest_model.version, 
                                             workload_size=workload_sizing,
                                             workload_type=workload_type

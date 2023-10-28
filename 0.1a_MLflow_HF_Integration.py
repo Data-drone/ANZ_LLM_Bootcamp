@@ -38,14 +38,15 @@ import os
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up the model
-cached_model_files = f'{bootcamp_dbfs_model_folder}/llama_2_13b'
+model = 'llama_2_13b'
+cached_model_files = f'{bootcamp_dbfs_model_folder}/{model}'
 
 tokenizer = AutoTokenizer.from_pretrained(cached_model_files, cache_dir=dbfs_tmp_cache)
 
 model_config = AutoConfig.from_pretrained(cached_model_files)
 model = AutoModelForCausalLM.from_pretrained(cached_model_files,
                                                config=model_config,
-                                               device_map='auto',
+                                               #device_map='auto',
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
                                                cache_dir=dbfs_tmp_cache
                                               )
@@ -64,25 +65,45 @@ for sentence in example_sentences:
 
 # COMMAND ----------
 
-# TODO - Fix for REGISTRATION_TIMEOUT - fault is with non uc only
+# DBTITLE 1,Configure Experiment
+experiment_name = f'/Users/{username}/{model}'
+try:
+  mlflow.create_experiment(experiment_name)
+except mlflow.exceptions.RestException:
+  print('experiment exists already')
 
-# Logging Model into MLflow
-experiment_name = f'/Users/{username}/llama_2_inference_model'
-run_name = 'llama_2_13b'
+mlflow.set_experiment(experiment_name)
+
+# setup model experiment details
+run_name = model
 
 # UC Catalog Settings
 use_uc = True
 catalog = 'bootcamp_ml'
 db = 'rag_chatbot'
-uc_model_name = 'llama_inference_model'
+uc_model_name = f'{model}_inference_model'
 
 artifact_path = "transformers_pipeline"
+
+if use_uc:
+   spark.sql(f'CREATE CATALOG IF NOT EXISTS {catalog}')
+   spark.sql(f'CREATE SCHEMA IF NOT EXISTS {catalog}.{db}')
+
+# set registry and the model naming
+if use_uc:
+  mlflow.set_registry_uri('databricks-uc')
+  register_name = f'{catalog}.{db}.{uc_model_name}'
+else:
+  register_name = uc_model_name
+
+# COMMAND ----------
 
 if not use_uc:
    # LLM Models are large and it can take a while to update
    # Default is 5min wait. This sets to 15min wait
    ## NOTE ## This problem goes away with UC
    os.environ['AWAIT_REGISTRATION_FOR'] = 900
+
 
 # Model Examples
 
@@ -103,14 +124,8 @@ data = "MLflow is great!"
 output = generate_signature_output(pipe, example_sentences)
 signature = infer_signature(data, output)
 
-try:
-  mlflow.create_experiment(experiment_name)
-except mlflow.exceptions.RestException:
-  print('experiment exists already')
-
 # See: https://mlflow.org/docs/latest/python_api/mlflow.transformers.html#mlflow.transformers.log_model
 # If we set registered_model_name then log will register too. Otherwise we can use the following line
-
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.transformers.log_model(
         transformers_model=pipe,
@@ -121,14 +136,6 @@ with mlflow.start_run(run_name=run_name) as run:
         extra_pip_requirements=['transformers==4.33.1',
                                 'accelerate==0.23.0'],
         metadata = {"task": "llm/v1/completions"},
-        registered_model_name = uc_model_name
+        registered_model_name = register_name
     )
 
-# COMMAND ----------
-
-# DBTITLE 1,Register Model
-model_name = uc_model_name
-
-# We need to know the Run id first. When running this straight then we can extract the run_id
-latest_model = mlflow.register_model(f'runs:/{run.info.run_id}/{artifact_path}', 
-                                     model_name)
