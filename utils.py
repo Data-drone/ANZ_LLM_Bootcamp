@@ -145,3 +145,44 @@ def string_printer(out_obj, run_mode):
   
   except KeyError:
     pprint.pprint(out_obj, indent=2)
+
+# COMMAND ----------
+
+# currently the langchain integration is broken
+from typing import Any, List, Mapping, Optional
+
+from langchain.callbacks.manager import CallbackManagerForLLMRun
+from langchain.llms.base import LLM
+import requests
+
+class ServingEndpointLLM(LLM):
+    endpoint_url: str
+    token: str
+
+    @property
+    def _llm_type(self) -> str:
+        return "databricks"
+
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        if stop is not None:
+            raise ValueError("stop kwargs are not permitted.")
+
+        header = {"Context-Type": "text/json", "Authorization": f"Bearer {self.token}"}
+
+        dataset = {'inputs': {'prompt': [prompt]},
+                  'params': kwargs}
+        
+        response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
+        
+        return response.json()['predictions'][0]['candidates'][0]['text']
+
+    @property
+    def _identifying_params(self) -> Mapping[str, Any]:
+        """Get the identifying parameters."""
+        return {"endpoint_url": self.endpoint_url}  

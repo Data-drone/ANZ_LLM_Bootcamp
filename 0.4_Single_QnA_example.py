@@ -45,7 +45,7 @@ from transformers import pipeline
 # COMMAND ----------
 
 # can also set to gpu
-run_mode = 'cpu' # 'gpu'
+run_mode = 'serving' # 'gpu'
 
 # COMMAND ----------
 
@@ -180,8 +180,17 @@ print(scores)
 try:
   llm_model
 except NameError:
-  pipe = load_model(run_mode, dbfs_tmp_cache)
-  llm_model = HuggingFacePipeline(pipeline=pipe)
+  if run_mode == 'serving':
+    serving_uri = 'vicuna_13b'
+    browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+    db_host = f"https://{browser_host}"
+    model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
+    db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+
+    llm_model = ServingEndpointLLM(endpoint_url=model_uri, token=db_token)
+  else:
+    pipe = load_model(run_mode, dbfs_tmp_cache, 'vicuna_13b')
+    llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
   pass
@@ -297,3 +306,6 @@ query = "What are some key facts from this document?"
 qa.run(query)
 
 # COMMAND ----------
+
+
+# TODO - Add in mlflow logging and testing for the module
