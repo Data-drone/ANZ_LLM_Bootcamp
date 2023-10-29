@@ -233,18 +233,29 @@ from ragas.metrics import (
 )
 from ragas.metrics.critique import harmfulness
 
+faithfulness.llm.langchain_llm = llm_model
+answer_relevancy.llm.langchain_llm = llm_model
+context_precision.llm.langchain_llm = llm_model
+context_recall.llm.langchain_llm = llm_model
+harmfulness.llm.langchain_llm = llm_model
+
 metrics = [
     faithfulness,
-    answer_relevancy,
-    context_precision,
-    context_recall,
-    harmfulness,
+    #answer_relevancy,
+    #context_precision,
+    #context_recall,
+    #harmfulness,
 ]
 
 # COMMAND ----------
 
 from ragas.llama_index import evaluate
 
-result = evaluate(query_engine, metrics, filtered_result['question'].tolist(), filtered_result['answer'].tolist())
+generated_questions = filtered_result['question'].astype(str).tolist()
+generated_ground_truths = filtered_result['answer'].astype(str).tolist()
 
+result = evaluate(query_engine=query_engine, 
+                  metrics=metrics, 
+                  questions=generated_questions) #, 
+                  #ground_truths=generated_ground_truths)
 # COMMAND ----------
