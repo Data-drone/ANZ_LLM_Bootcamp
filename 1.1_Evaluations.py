@@ -4,13 +4,10 @@
 # MAGIC Running Evaluations on RAGs is still more art than science \
 # MAGIC We will use llama_index to assist in generating evaluation questions \
 # MAGIC And use the inbuilt assessment prompt in llama_index \
-# MAGIC 
-# MAGIC We use an older llama_index to align with MLR 13.3 LTS Langchain version \
-# MAGIC as llama_index relies a lot on Langchain
 
 # COMMAND ----------
 
-%pip install llama_index==0.8.9 langchain==0.0.284
+%pip install llama_index==0.8.54 spacy ragas==0.0.18
 
 # COMMAND ----------
 
@@ -18,7 +15,10 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-%autoawait asyncio
+import nest_asyncio
+# Needed for the async calls to work
+nest_asyncio.apply()
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -38,7 +38,6 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 import os
-import openai
 
 # COMMAND ----------
 
@@ -49,67 +48,44 @@ test_pdf
 
 # COMMAND ----------
 
-# For this example we will use azure openai for now
-# Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
-
-openai.api_type = "azure"
-#openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
-#openai.api_key = openai_key
-#openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
-os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
-
-deployment_name = 'daiwt-demo'
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Setup Service Context
-# MAGIC By default, llama_index assumes that OpenAI is the service context \
-# MAGIC We are using AzureOpen AI so the setup is a little different. \
-# MAGIC Azure OpenAI notably requires two deployments, an embedder and the model \
-# MAGIC We will demonstrate a hybrid setup here where we use a huggingface sentence transformer \
-# MAGIC that will do the embeddings for our vector store \
-# MAGIC Whilst AzureOpenAI (gpt-3.5-turbo) provides the brains
+# MAGIC The service context sets up the LLM and embedding model that we will use for our exercises
+# MAGIC In this case, the Embedding Model and the LLM are both setup onto Databricks serving
 
 # COMMAND ----------
 
-from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from llama_index import (
   ServiceContext,
   set_global_service_context,
   LLMPredictor
 )
-from llama_index.embeddings import LangchainEmbedding
 from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
-from langchain.chat_models import AzureChatOpenAI
 
-# Azure OpenAI Embeddings - needed cause ragas uses async
-embedding_llm = LangchainEmbedding(
-    OpenAIEmbeddings(
-        model="text-embedding-ada-002",
-        deployment="daiwt-demo-embedding",
-        openai_api_key=openai_key,
-        openai_api_base=os.environ['OPENAI_API_BASE'],
-        openai_api_type=openai.api_type,
-        openai_api_version=os.environ['OPENAI_API_VERSION'],
-    ),
-    embed_batch_size=1,
-)
+# Using Databricks Model Serving
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
-# See: https://github.com/openai/openai-python/issues/318
-llm = AzureChatOpenAI(deployment_name=deployment_name,
-                      model_name="gpt-35-turbo")
+serving_uri = 'vicuna_13b'
+serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
 
-llm_predictor = LLMPredictor(llm=llm)
+embedding_uri = 'brian_embedding_endpoint'
+embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
+
+llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
+
+llm_predictor = LLMPredictor(llm=llm_model)
+
+### define embedding model setup
+from langchain.embeddings import MosaicMLInstructorEmbeddings
+embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
 
 llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 callback_manager = CallbackManager([llama_debug])
 
 service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=embedding_llm,
+                                               embed_model=embeddings,
                                                callback_manager = callback_manager 
                                                )
 
@@ -158,13 +134,17 @@ print(reply.response)
 # MAGIC Note that this will have limitations, namely in the types of questions it will generate
 # COMMAND ----------
 
-from llama_index.evaluation import DatasetGenerator, QueryResponseEvaluator
+from llama_index.evaluation import DatasetGenerator, RelevancyEvaluator
 
 # this is the question generator. Note that it has additional settings to customise prompt etc
-data_generator = DatasetGenerator.from_documents(documents=documents)
+data_generator = DatasetGenerator.from_documents(documents=documents, service_context=service_context)
 
 # this is the call to generate the questions
 eval_questions = data_generator.generate_questions_from_nodes()
+eval_questions
+
+# Some of these questions might not be too useful. It could be because of the model we are using for generation
+# It could also be that the chunk is particularly bad
 
 # COMMAND ----------
 
@@ -173,7 +153,7 @@ eval_questions = data_generator.generate_questions_from_nodes()
 # MAGIC Now we have our queries we need to run some responses
 # MAGIC
 # MAGIC This next step can be slow so we will cut it down to 20 questions \
-# MAGIC We can then use the `QueryResponseEvaluator`` looks at whether the query is answered by the response
+# MAGIC We can then use the `ResponseEvaluator`` looks at whether the query is answered by the response
 
 # COMMAND ----------
 
@@ -182,7 +162,9 @@ import pandas as pd
 eval_questions = eval_questions[0:20]
 
 # Yes we are using a LLM to evaluate a LLM
-evaluator_azure_openai = QueryResponseEvaluator()
+## When doing this normally you might use a more powerful but more expensive evaluator
+## to assess the quality of your input
+evaluator = RelevancyEvaluator(service_context=service_context)
 
 # lets create and log the data properly
 results = []
@@ -190,7 +172,7 @@ results = []
 for question in eval_questions:
     
     engine_response = query_engine.query(question)
-    evaluation = evaluator_azure_openai.evaluate(question, engine_response)
+    evaluation = evaluator.evaluate_response(question, engine_response)
     results.append(
       {
         "query": question,
@@ -202,10 +184,6 @@ for question in eval_questions:
 
 # we will load it into a pandas frame: 
 response_df = pd.DataFrame(results)
-
-# Lets do a simple YES/NO evaluation
-evaluation_counts = response_df.groupby('evaluation').size().reset_index(name='Count')
-
 # COMMAND ----------
 
 # Let see what is in the frame
@@ -213,6 +191,72 @@ response_df
 
 # COMMAND ----------
 
-evaluation_counts
+# MAGIC %md # Introducing the Ragas Framework
+# MAGIC Ragas provides us with a more comprehensive framework for evaluation
+# MAGIC Lets see how the Question Generator for Ragas works
 
+# COMMAND ----------
+
+from ragas.testset import TestsetGenerator
+
+question_generator = TestsetGenerator(generator_llm=llm_model,
+                                      critic_llm=llm_model,
+                                      embeddings_model=embeddings,
+                                      chat_qa=0.0)
+
+# COMMAND ----------
+
+generation_result = question_generator.generate(documents=documents, test_size=10)
+
+pd_generation_result = generation_result.to_pandas()
+pd_generation_result
+
+# COMMAND ----------
+
+# Due to our bad chunking, some of the questions are pretty bad
+# We can do a basic filter
+filtered_result = pd_generation_result[pd_generation_result['question'].str.len() >= 50]
+#filtered_result = filtered_result.drop([1])
+filtered_result
+
+# COMMAND ----------
+
+# We can spot check some of the data
+filtered_result.iloc[0].question
+
+# COMMAND ----------
+
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_precision,
+    context_recall,
+)
+from ragas.metrics.critique import harmfulness
+
+faithfulness.llm.langchain_llm = llm_model
+answer_relevancy.llm.langchain_llm = llm_model
+context_precision.llm.langchain_llm = llm_model
+context_recall.llm.langchain_llm = llm_model
+harmfulness.llm.langchain_llm = llm_model
+
+metrics = [
+    faithfulness,
+    #answer_relevancy,
+    #context_precision,
+    #context_recall,
+    #harmfulness,
+]
+
+# COMMAND ----------
+
+from ragas.llama_index import evaluate
+
+generated_questions = filtered_result['question'].astype(str).tolist()
+generated_ground_truths = filtered_result['answer'].astype(str).tolist()
+
+result = evaluate(query_engine=query_engine, 
+                  metrics=metrics, 
+                  questions=generated_questions) #, 
+                  #ground_truths=generated_ground_truths)
 # COMMAND ----------
