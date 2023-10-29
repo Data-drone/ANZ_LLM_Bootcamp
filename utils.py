@@ -161,7 +161,7 @@ class ServingEndpointLLM(LLM):
 
     @property
     def _llm_type(self) -> str:
-        return "databricks"
+        return "custom"
 
     def _call(
         self,

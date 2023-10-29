@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pypdf sentence_transformers chromadb==0.3.29 ctransformers==0.2.26
+# MAGIC %pip install pypdf sentence_transformers chromadb==0.4.15 ctransformers==0.2.26
 
 # COMMAND ----------
 
@@ -129,7 +129,7 @@ for i, t in enumerate(texts):
   if i % 2:
     t.metadata = {"source": file_path}
   else:
-    t.metadata = {"source": "Uknown"}
+    t.metadata = {"source": "Unknown"}
 
 print(texts[0].metadata)
 print(texts[1].metadata)
@@ -181,6 +181,8 @@ try:
   llm_model
 except NameError:
   if run_mode == 'serving':
+
+    ## the Langchain Databricks LLM definition is currently not compatible with Optimised Serving
     serving_uri = 'vicuna_13b'
     browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
     db_host = f"https://{browser_host}"
@@ -307,5 +309,143 @@ qa.run(query)
 
 # COMMAND ----------
 
+# MAGIC %md # Logging and Saving Models
+# MAGIC Just like with logging and managing prompts, it is possible to log our chain entity as a mlflow model
+# MAGIC We can then use mlflow evaluate to compare different module configurations or splitting and parsing strategies
 
-# TODO - Add in mlflow logging and testing for the module
+# COMMAND ----------
+
+import mlflow
+import pandas as pd
+import shutil
+
+mlflow_dir = f'/Users/{username}/simple_rag_chain'
+mlflow.set_experiment(mlflow_dir)
+
+# COMMAND ----------
+
+# We need to save out our Chroma
+# Load and chunk
+file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
+
+chroma_local_folder = '/local_disk0/chromadb'
+chroma_archive_folder = f'/dbfs/Users/{username}/simple_chromadb'
+
+loader = PyPDFLoader(file_to_load)
+pages = loader.load_and_split()
+text_splitter = CharacterTextSplitter(chunk_size=700, chunk_overlap=100)
+texts = text_splitter.split_documents(pages)
+
+docsearch = Chroma.from_documents(texts, embeddings, persist_directory=chroma_local_folder)
+
+## Whilst we can archive Chroma files onto dbfs, the working files must be on a local SSD like local_disk0
+shutil.copytree(chroma_local_folder, chroma_archive_folder)
+
+# COMMAND ----------
+
+# We can setup some example questions for testing the chain as well
+test_questions = ['What are the basic components of a Transformer?',
+                  'What is a tokenizer?',
+                  'How can we handle audio?',
+                  'Are there alternatives to transformers?']
+
+testing_questions = pd.DataFrame(
+    test_questions, columns = ['prompt']
+)
+
+# COMMAND ----------
+
+# This is a custom wrapper allows us to log langchain to mlflow as a model
+class LangchainQABot(mlflow.pyfunc.PythonModel):
+    
+    def __init__(self, model_uri, token, system_template, chroma_archive_dir:str=chroma_archive_folder):
+        self.model_uri = model_uri
+        self.token = token
+        self.system_template = system_template
+        self.chroma_archive_dir = chroma_archive_dir
+        self.chroma_local_dir = '/local_disk0/chromadb'
+
+    def setup_retriever(self):
+        try:
+          shutil.copytree(self.chroma_archive_dir, self.chroma_local_dir)
+        except FileExistsError:
+          shutil.rmtree(self.chroma_local_dir)
+          shutil.copytree(self.chroma_archive_dir, self.chroma_local_dir)
+
+        embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
+                                   model_kwargs={'device': 'cpu'})
+        doc_search = Chroma(persist_directory=self.chroma_local_dir, embedding_function=embeddings)
+        return doc_search.as_retriever(search_kwargs={"k": 3})
+
+    def load_context(self, context):
+        from typing import Any, List, Mapping, Optional
+        from langchain.callbacks.manager import CallbackManagerForLLMRun
+        from langchain.llms.base import LLM
+        import requests
+
+        self.retriever = self.setup_retriever()
+
+        self.prompt_template = PromptTemplate(
+            input_variables=["question", "context"], template=self.system_template
+        )
+        
+        # Our class must be included as it is not pickleable
+        class ServingEndpointLLM(LLM):
+            endpoint_url: str
+            token: str
+
+            @property
+            def _llm_type(self) -> str:
+                return "custom"
+
+            def _call(
+                self,
+                prompt: str,
+                stop: Optional[List[str]] = None,
+                run_manager: Optional[CallbackManagerForLLMRun] = None,
+                **kwargs: Any,
+            ) -> str:
+                if stop is not None:
+                    raise ValueError("stop kwargs are not permitted.")
+                
+                header = {"Context-Type": "text/json", "Authorization": f"Bearer {self.token}"}
+
+                dataset = {'inputs': {'prompt': [prompt]},
+                          'params': kwargs}
+
+                response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
+
+                return response.json()['predictions'][0]['candidates'][0]['text']
+
+            @property
+            def _identifying_params(self) -> Mapping[str, Any]:
+                """Get the identifying parameters."""
+                return {"endpoint_url": self.endpoint_url} 
+    
+        llm = ServingEndpointLLM(endpoint_url=self.model_uri, token=self.token)
+
+        self.qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", 
+                                 retriever=self.retriever,
+                                 chain_type_kwargs={"prompt": self.prompt_template})
+    
+    def predict(self, context, data):
+        questions = data['prompt']
+        results = [self.qa.run(x) for x in questions] 
+        return results
+
+# COMMAND ----------
+
+model = LangchainQABot(model_uri, db_token, system_template, chroma_archive_folder)
+
+with mlflow.start_run() as run:
+  mlflow_result = mlflow.pyfunc.log_model(
+      python_model = model,
+      extra_pip_requirements = ['langchain==0.0.267'],
+      artifact_path = 'langchain_pyfunc'
+  )
+
+  mlflow.evaluate(mlflow_result.model_uri,
+                  testing_questions,
+                  model_type="text")
+
+# COMMAND ----------
