@@ -8,15 +8,15 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install ctransformers for CPU inference
-# MAGIC %pip install ctransformers==0.2.26
-
+# MAGIC #%pip install ctransformers==0.2.26
+# MAGIC %pip install git+https://github.com/mlflow/mlflow.git@master
 # COMMAND ----------
 
 dbutils.library.restartPython()
 
 # COMMAND ----------
 
-run_mode = 'cpu' # or gpu
+run_mode = 'serving' # or gpu or cpu
 
 # COMMAND ----------
 
@@ -44,14 +44,14 @@ pipe = load_model(run_mode, dbfs_tmp_cache)
 # COMMAND ----------
 
 prompt = "The sky is"
-output = pipe(prompt, max_new_tokens=100)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
 # COMMAND ----------
 
 prompt = "Knock Knock"
-output = pipe(prompt, max_new_tokens=100)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -62,7 +62,7 @@ prompt = """
     Who's there?
     """
 
-output = pipe(prompt, max_new_tokens=10)
+output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -81,7 +81,7 @@ prompt = """
     Sentiment:
 """
 
-output = pipe(prompt, max_new_tokens=20)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -95,16 +95,13 @@ print(str_output)
 
 # COMMAND ----------
 
-prompt = """
-<s>[INST]<<SYS>>
-Classify the text into neutral, negative or positive.
-<</SYS>>    
-Text: 
-I think the vacation is okay.
-Sentiment:[/INST]
+prompt = """<s>[INST]<<SYS>>Classify the text into neutral, negative or positive.<</SYS>>
+
+Text: I think the vacation is okay.
+Sentiment: [/INST]
 """
 
-output = pipe(prompt, max_new_tokens=5)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -117,19 +114,15 @@ print(str_output)
 
 # COMMAND ----------
 
-prompt = """
-<s>[INST]<<SYS>>
-Provide an answer to the question based on the following:
-<</SYS>>    
+prompt = """<s>[INST]<<SYS>>Provide an answer to the question based on the following:<</SYS>>
+
 The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
 
-User Question:
-What is the interest rate in following paragraph?
-    
-[/INST]
+User Question: What is the interest rate in following paragraph?
+Answer: [/INST]
 """
 
-output = pipe(prompt, max_new_tokens=60)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -156,7 +149,7 @@ Question:
 What account would you recommend a small business?[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -176,7 +169,7 @@ Question:
 What account would you recommend a bob the builder?[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -214,7 +207,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=250)
+output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -246,7 +239,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=250)
+output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -279,7 +272,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=15)
+output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -299,7 +292,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=350)
+output = pipe([prompt], max_tokens=500)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -359,7 +352,7 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=512)
+output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -369,10 +362,7 @@ system_prompt = 'As a helpful long island librarian, answer the questions provid
 
 user_question = 'Explain to me like I am 5 LK-99'
 
-prompt = f"""
-<s>[INST]<<SYS>>
-{system_prompt}
-<</SYS>>    
+prompt = f"""<s>[INST]<<SYS>>{system_prompt}<</SYS>>
 
 Based on the below context:
 
@@ -382,7 +372,7 @@ Provide an answer to the following:
 {user_question}[/INST]
 """
 
-output = pipe(prompt, max_new_tokens=512)
+output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
 
@@ -394,6 +384,7 @@ print(str_output)
 # MAGIC You might have already ended up with spreadsheets of prompts and replies!\
 # MAGIC Whilst MLflow support for LLMs is still an area of improvement we have made great strides already\
 # MAGIC
+# MAGIC TODO Update links
 # MAGIC See: https://www.databricks.com/blog/2023/04/18/introducing-mlflow-23-enhanced-native-llm-support-and-new-features.html
 # MAGIC See: https://www.databricks.com/blog/announcing-mlflow-24-llmops-tools-robust-model-evaluation
 # MAGIC
@@ -403,35 +394,55 @@ print(str_output)
 # COMMAND ----------
 
 import mlflow
+import pandas as pd
 
 mlflow_dir = f'/Users/{username}/mlflow_log_hf'
 mlflow.set_experiment(mlflow_dir)
 
 # COMMAND ----------
 
-# DBTITLE 1,Setup Configs
-user_inputs = [
-  "How can I make a coffee?",
-  "How can I book a restaurant?",
-  "How can I make idle chit chat when I don't know a person?"
+# DBTITLE 1,Evaluation Prompts
+common_test_prompts = [
+    "What is the capital of Korea?",
+    "Name the top 10 kpop groups in the world",
+    "Write me a infomercial script on why kimchi is good?",
+    "What best way to make an omlet?",
+    "What would you do if you had 1M dollars?"
 ]
-prompts = []
-model_outputs = []
+
+testing_pandas_frame = pd.DataFrame(
+    common_test_prompts, columns = ['prompt']
+)
 
 # COMMAND ----------
 
-with mlflow.start_run(run_name='openassist model'):
+# starting with mlflow 2.8 we don't have to use evaluate with a pyfunc function is okay
+def eval_pipe(inputs):
+    answers = []
+    for index, row in inputs.iterrows():
+        result = pipe([row.item()])
+        answer = result['predictions'][0]['candidates'][0]['text']
+        answers.append(answer)
     
-  for user_input in user_inputs:
-    prompt = f"""
-            You are an AI assistant that helps people find information and responds in rhyme. 
-            If the user asks you a question you don't know the answer to, say so.
+    return answers
+# COMMAND ----------
 
-            {user_input}
-            """
+with mlflow.start_run(run_name='llama_2_7b'):
+    pipe = load_model(run_mode, dbfs_tmp_cache, 'llama_2_7b')
+    results = mlflow.evaluate(eval_pipe, 
+                          data=testing_pandas_frame, 
+                          model_type='text')
+    
+with mlflow.start_run(run_name='llama_2_13b'):
+    pipe = load_model(run_mode, dbfs_tmp_cache, 'llama_2_13b')
+    results = mlflow.evaluate(eval_pipe, 
+                          data=testing_pandas_frame, 
+                          model_type='text')
 
-    raw_output = pipe(prompt, repetition_penalty=1.2)
-    text_output = string_printer(raw_output, run_mode)
+with mlflow.start_run(run_name='vicuna_13b'):
+    pipe = load_model(run_mode, dbfs_tmp_cache, 'vicuna_13b')
+    results = mlflow.evaluate(eval_pipe, 
+                          data=testing_pandas_frame, 
+                          model_type='text')
 
-    mlflow.llm.log_predictions(inputs=[user_input], outputs=[text_output], prompts=[prompt])
 

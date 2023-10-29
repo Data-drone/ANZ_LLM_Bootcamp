@@ -9,6 +9,8 @@
 # setup env
 # TODO - adjust and use bootcamp ones later
 import os
+import requests
+import pprint
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -46,7 +48,29 @@ bootcamp_dbfs_model_folder = '/dbfs/bootcamp_data/hf_cache/downloads'
 
 # COMMAND ----------
 
-def load_model(run_mode: str, dbfs_cache_dir: str):
+class QueryEndpoint:
+    """
+    A class designed to be interchangeable with pipe but calls databricks model serving instead
+    """
+   
+    def __init__(self, uri:str, token:str):
+      
+      self.uri = uri
+      self.header = {"Context-Type": "text/json", "Authorization": f"Bearer {token}"}
+      print(uri)
+
+
+    def __call__(self, prompt: list[str], **kwargs):
+       
+      dataset = {'inputs': {'prompt': prompt},
+                  'params': kwargs}
+
+      response = requests.post(headers=self.header, url=self.uri, json=dataset)
+
+      return response.json()
+# COMMAND ----------
+
+def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b'):
     """
     run_mode (str) - can be gpu or cpu
     """
@@ -54,7 +78,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
     from transformers import pipeline, AutoConfig
     import torch
 
-    assert run_mode in ['cpu', 'gpu'], f'run_mode must be cpu or gpu not {run_mode}'
+    assert run_mode in ['cpu', 'gpu', 'serving'], f'run_mode must be cpu, gpu or serving not {run_mode}'
 
     if run_mode == 'cpu':
 
@@ -92,6 +116,16 @@ def load_model(run_mode: str, dbfs_cache_dir: str):
 
         return pipe
     
+    elif run_mode == 'serving':
+        
+        browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+        db_host = f"https://{browser_host}"
+        model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
+        db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+
+        test_pipe = QueryEndpoint(model_uri, db_token)
+
+        return test_pipe
 
 # COMMAND ----------
 
@@ -100,5 +134,55 @@ def string_printer(out_obj, run_mode):
   """
   Short convenience function because the output formats change between CPU and GPU
   """
+  try:
+    if run_mode in ['cpu', 'gpu']:
 
-  return out_obj[0]['generated_text']
+      return pprint.pprint(out_obj[0]['generated_text'], indent=2)
+  
+    elif run_mode == 'serving':
+    
+      return  pprint.pprint(out_obj['predictions'], indent=2)
+  
+  except KeyError:
+    pprint.pprint(out_obj, indent=2)
+
+# COMMAND ----------
+
+# currently the langchain integration is broken
+from typing import Any, List, Mapping, Optional
+
+from langchain.callbacks.manager import CallbackManagerForLLMRun
+from langchain.llms.base import LLM
+import requests
+
+class ServingEndpointLLM(LLM):
+    endpoint_url: str
+    token: str
+
+    @property
+    def _llm_type(self) -> str:
+        return "custom"
+
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        if stop is not None:
+            raise ValueError("stop kwargs are not permitted.")
+
+        header = {"Context-Type": "text/json", "Authorization": f"Bearer {self.token}"}
+
+        dataset = {'inputs': {'prompt': [prompt]},
+                  'params': kwargs}
+        
+        response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
+        
+        return response.json()['predictions'][0]['candidates'][0]['text']
+
+    @property
+    def _identifying_params(self) -> Mapping[str, Any]:
+        """Get the identifying parameters."""
+        return {"endpoint_url": self.endpoint_url}  

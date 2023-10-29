@@ -31,6 +31,7 @@ model_name = 'meta-llama/Llama-2-7b-chat-hf'
 revision = '08751db2aca9bf2f7f80d2e516117a53d7450235'
 
 # UC Catalog Settings
+use_uc = True
 catalog = 'brian_ml'
 db = 'rag_chatbot'
 uc_model_name = 'hf_inference_model'

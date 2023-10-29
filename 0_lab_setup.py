@@ -134,13 +134,25 @@ huggingface_hub.login(token=huggingface_key)
 from huggingface_hub import hf_hub_download, list_repo_files
 
 repo_list = {'llama_2_gpu': 'meta-llama/Llama-2-7b-chat-hf',
-             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGUF'}
+             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGUF',
+             'llama_2_awq': 'TheBloke/Llama-2-7B-AWQ',
+             'llama_2_13b': 'meta-llama/Llama-2-13b-chat-hf',
+             'llama_2_13b_awq': 'TheBloke/Llama-2-13B-chat-AWQ',
+             'vicuna_1.5_13b': 'lmsys/vicuna-13b-v1.5',
+             'vicuna_1.5_13b_awq': 'TheBloke/vicuna-13B-v1.5-16K-AWQ',
+             'mistral_7b_instruct': 'mistralai/Mistral-7B-Instruct-v0.1',
+             'mistral_7b': 'mistralai/Mistral-7B-v0.1',
+             'zephyr_7b': 'HuggingFaceH4/zephyr-7b-beta'} #,
+             #'llama_2_70b': 'meta-llama/Llama-2-70b-chat-hf'}
 
 for lib_name in repo_list.keys():
     for name in list_repo_files(repo_list[lib_name]):
         # skip all the safetensors data as we aren't using it and it's time consuming to download
         if "safetensors" in name:
-            continue
+            if lib_name in ['llama_2_awq', 'llama_2_13b_awq', 'vicuna_1.5_13b_awq']:
+                pass
+            else:
+                continue
         target_path = os.path.join(dbfs_downloads_home, lib_name, name)
         if not os.path.exists(target_path):
             print(f"Downloading {name}")
