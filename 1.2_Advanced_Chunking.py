@@ -20,7 +20,6 @@ dbutils.library.restartPython()
 from langchain.document_loaders import PyMuPDFLoader
 import os
 
-
 # COMMAND ----------
 # DBTITLE 1,Setup
 
@@ -36,7 +35,7 @@ sample_file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
 # COMMAND ----------
 
 # load a model for testing
-run_mode = 'cpu'
+run_mode = 'serving'
 pipe = load_model(run_mode, dbfs_tmp_cache)
 
 # COMMAND ----------
@@ -84,7 +83,7 @@ Assistant:"""
 
 # COMMAND ----------
 
-pipe(prompt_template, max_new_tokens=100, repetition_penalty=1.2)
+pipe([prompt_template])
 
 # COMMAND ----------
 
@@ -106,7 +105,7 @@ User: {question}
 
 Assistant:"""
 
-pipe(prompt_template, max_new_tokens=100, repetition_penalty=1.2)
+pipe([prompt_template])
 
 
 # COMMAND ----------
@@ -231,66 +230,42 @@ element_to_examine
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up Service context
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.chat_models import AzureChatOpenAI
-import openai
-
-# Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
-
-openai.api_type = "azure"
-#openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
-#openai.api_key = openai_key
-#openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
-os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
-
-deployment_name = 'daiwt-demo'
-
-azure_openai_embedding = OpenAIEmbeddings(
-        model="text-embedding-ada-002",
-        deployment="daiwt-demo-embedding",
-        openai_api_key=openai_key,
-        openai_api_base=os.environ['OPENAI_API_BASE'],
-        openai_api_type=openai.api_type,
-        openai_api_version=os.environ['OPENAI_API_VERSION'],
-    )
-
-# See: https://github.com/openai/openai-python/issues/318
-llm = AzureChatOpenAI(deployment_name=deployment_name,
-                      model_name="gpt-35-turbo")
-
 from llama_index import (
   ServiceContext,
   set_global_service_context,
   LLMPredictor
 )
-from llama_index.embeddings import LangchainEmbedding
-from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler
+from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
 
+# Using Databricks Model Serving
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
-# Azure OpenAI Embeddings - needed cause ragas uses async
-embedding_llm = LangchainEmbedding(
-    azure_openai_embedding,
-    embed_batch_size=1,
-)
-#ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
+serving_uri = 'vicuna_13b'
+serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
 
+embedding_uri = 'brian_embedding_endpoint'
+embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
 
-llm_predictor = LLMPredictor(llm=llm)
+llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
 
-callback_handler = OpenInferenceCallbackHandler()
-callback_manager = CallbackManager([callback_handler])
+llm_predictor = LLMPredictor(llm=llm_model)
+
+### define embedding model setup
+from langchain.embeddings import MosaicMLInstructorEmbeddings
+embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
+
+llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+callback_manager = CallbackManager([llama_debug])
 
 service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=embedding_llm,
+                                               embed_model=embeddings,
                                                callback_manager = callback_manager 
                                                )
 
 # we can now set this context to be a global default
 set_global_service_context(service_context)
-
 
 # COMMAND ----------
 
