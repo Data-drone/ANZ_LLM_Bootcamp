@@ -162,6 +162,7 @@ class ServingEndpointLLM(LLM):
     endpoint_url: str
     token: str
     temperature: float = 0.1
+    max_length: int = 256
 
     @property
     def _llm_type(self) -> str:
@@ -175,22 +176,30 @@ class ServingEndpointLLM(LLM):
         **kwargs: Any,
     ) -> str:
         if stop is not None:
-            raise ValueError("stop kwargs are not permitted.")
+            #raise ValueError("stop kwargs are not permitted.")
+            pass
 
         header = {"Context-Type": "text/json", "Authorization": f"Bearer {self.token}"}
 
         if type(prompt) is str:
-          dataset = {'inputs': {'prompt': [prompt]},
-                  'params': kwargs}
+            dataset = {'inputs': {'prompt': [prompt]},
+                  'params': {**{'max_tokens': self.max_length}, **kwargs}}
         elif type(prompt) is ChatPromptTemplate:
-          text_prompt = prompt.format()
-          dataset = {'inputs': {'prompt': [text_prompt]},
-                  'params': kwargs} 
+            text_prompt = prompt.format()
+            dataset = {'inputs': {'prompt': [text_prompt]},
+                  'params': {**{'max_tokens': self.max_length}, **kwargs}} 
         #print(dataset)
         try:
-          response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
+            response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
+
+            try:
         
-          return response.json()['predictions'][0]['candidates'][0]['text']
+                return response.json()['predictions'][0]['candidates'][0]['text']
+            
+            except KeyError:
+                print(response)
+                return str(response.json())
+
         
         except TypeError:
           print(dataset)

@@ -6,7 +6,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Extra Libs to install
-%pip install pypdf ctransformers==0.2.26 unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.9 langchain==0.0.284 opencv-python chromadb==0.4.9
+%pip install pypdf ctransformers==0.2.26 unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.54 opencv-python chromadb==0.4.15
 
 # COMMAND ----------
 
@@ -34,9 +34,8 @@ dbutils.library.restartPython()
 from langchain.embeddings import HuggingFaceEmbeddings
 from llama_index.embeddings import LangchainEmbedding
 
-embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
-                                   model_kwargs={'device': 'cpu'})
-
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
 hf_embed = LangchainEmbedding(langchain_embeddings=embeddings)
 
 # COMMAND ----------
@@ -88,40 +87,37 @@ documents = SimpleDirectoryReader(
 # COMMAND ----------
 
 # DBTITLE 1,Creating Llama-index Service Context
-from langchain.chat_models import AzureChatOpenAI
-import openai
-
 from llama_index import (
   ServiceContext,
   set_global_service_context,
   LLMPredictor
 )
-from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler
+from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
 
+# Using Databricks Model Serving
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
-# Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
+serving_uri = 'vicuna_13b'
+serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
 
-openai.api_type = "azure"
-#openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
-#openai.api_key = openai_key
-#openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
-os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
+embedding_uri = 'brian_embedding_endpoint'
+embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
 
-deployment_name = 'daiwt-demo'
+llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
 
-# See: https://github.com/openai/openai-python/issues/318
-llm = AzureChatOpenAI(deployment_name=deployment_name,
-                      model_name="gpt-35-turbo")
+llm_predictor = LLMPredictor(llm=llm_model)
 
-llm_predictor = LLMPredictor(llm=llm)
+### define embedding model setup
+from langchain.embeddings import MosaicMLInstructorEmbeddings
+embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
 
-callback_handler = OpenInferenceCallbackHandler()
-callback_manager = CallbackManager([callback_handler])
+llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+callback_manager = CallbackManager([llama_debug])
+
 service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=hf_embed,
+                                               embed_model=embeddings,
                                                callback_manager = callback_manager 
                                                )
 
@@ -142,11 +138,6 @@ query_engine = index.as_query_engine()
 response = query_engine.query("Tell me about the mT5 model")
 
 print(response.response)
-# COMMAND ----------
-
-# TODO Integration with langchain and memory
-
-# COMMAND ----------
 # COMMAND ----------
 
 # MAGIC %md
@@ -176,14 +167,10 @@ tool = LlamaIndexTool.from_tool_config(tool_config)
 tools = [tool]
 
 agent_executor = initialize_agent(
-    tools, llm, agent="conversational-react-description", memory=memory
+    tools, llm_model, agent="conversational-react-description", memory=memory
 )
 
 agent_executor.run(input="Tell me about mT5 model")
-# COMMAND ----------
-
-agent_executor.run(input="Tell me more!")
-
 # COMMAND ----------
 
 agent_executor.run(input="Tell me more!")
