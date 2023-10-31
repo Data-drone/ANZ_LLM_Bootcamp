@@ -12,7 +12,7 @@
 
 # COMMAND ----------
 # MAGIC # "arize-phoenix[experimental]"  pandas==1.5.3
-# MAGIC %pip install -U llama_index==0.8.9 langchain==0.0.284 faiss-cpu datashader bokeh holoviews scikit-image colorcet
+# MAGIC %pip install -U llama_index==0.8.54 faiss-cpu datashader bokeh holoviews scikit-image colorcet "arize-phoenix[experimental]"
 
 # COMMAND ----------
 
@@ -30,7 +30,6 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 import os
-import openai
 import numpy as np
 
 # COMMAND ----------
@@ -42,50 +41,28 @@ test_pdf
 
 # COMMAND ----------
 
-# For this example we will use azure openai for now
-# Setup OpenAI Creds
-openai_key = dbutils.secrets.get(scope='bootcamp_training', key='bootcamp_openai')
-
-openai.api_type = "azure"
-#openai.api_base = "https://dbdemos-open-ai.openai.azure.com/"
-#openai.api_key = openai_key
-#openai.api_version = "2023-07-01-preview"
-os.environ['OPENAI_API_BASE'] = 'https://anz-bootcamp-daiswt.openai.azure.com/'
-os.environ['OPENAI_API_KEY'] = openai_key
-os.environ['OPENAI_API_VERSION'] = "2023-07-01-preview"
-
-deployment_name = 'daiwt-demo'
-
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC
 # MAGIC # Understanding Embeddings
 # MAGIC
 # MAGIC Lets explore how data embeds a bit more in order to see how we can improve retrieval \
-# MAGIC We will use openai to start
+# MAGIC We will use a model deployed on Databricks Model Serving
 # COMMAND ----------
 
 # DBTITLE 1,Setup some embedding algorithms
-from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
-from langchain.chat_models import AzureChatOpenAI
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
-azure_openai_embedding = OpenAIEmbeddings(
-        model="text-embedding-ada-002",
-        deployment="daiwt-demo-embedding",
-        openai_api_key=openai_key,
-        openai_api_base=os.environ['OPENAI_API_BASE'],
-        openai_api_type=openai.api_type,
-        openai_api_version=os.environ['OPENAI_API_VERSION'],
-    )
+serving_uri = 'vicuna_13b'
+serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
 
-# See: https://github.com/openai/openai-python/issues/318
-llm = AzureChatOpenAI(deployment_name=deployment_name,
-                      model_name="gpt-35-turbo")
+embedding_uri = 'brian_embedding_endpoint'
+embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
 
+llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
 
-#embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2', model_kwargs={'device': 'cpu'})
+embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
 
 # COMMAND ----------
 
@@ -108,7 +85,7 @@ example_sentences = ["The kangaroo population in Australia is declining due to h
 "Kangaroos play an important role in maintaining the ecosystem balance in Australia.",
 "Australia has strict laws regulating the hunting and trade of kangaroos to protect their population."] 
 
-encoded_sentences = [azure_openai_embedding.embed_query(sentence) for sentence in example_sentences]
+encoded_sentences = [embeddings.embed_query(sentence) for sentence in example_sentences]
 vector_format_encode = np.array(encoded_sentences, dtype=np.float32)
 vector_format_encode /= np.linalg.norm(vector_format_encode, axis=1)[:, np.newaxis]
 
@@ -117,7 +94,7 @@ vector_index = faiss.IndexFlatIP(vector_format_encode.shape[1])
 vector_index.add(vector_format_encode)
 
 test_question = "What is affecting the population of kangaroos?"
-embedded_query = np.array(azure_openai_embedding.embed_query(test_question))
+embedded_query = np.array(embeddings.embed_query(test_question))
 
 # COMMAND ----------
 
@@ -168,7 +145,7 @@ rerank_prompt = ("A list of documents is shown below. Each document has a number
     f"Question: {test_question}\n"
     "Answer:\n")
 
-reranked_result = llm.call_as_llm(rerank_prompt)
+reranked_result = llm_model(rerank_prompt)
 
 print(reranked_result)
 
@@ -241,24 +218,14 @@ from llama_index import (
   LLMPredictor
 )
 from llama_index.embeddings import LangchainEmbedding
-from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler
-
-
-# Azure OpenAI Embeddings - needed cause ragas uses async
-embedding_llm = LangchainEmbedding(
-    azure_openai_embedding,
-    embed_batch_size=1,
-)
-#ll_embed = LangchainEmbedding(langchain_embeddings=embeddings)
-
-
-llm_predictor = LLMPredictor(llm=llm)
+from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler, LlamaDebugHandler
 
 callback_handler = OpenInferenceCallbackHandler()
 callback_manager = CallbackManager([callback_handler])
 
+llm_predictor = LLMPredictor(llm=llm_model)
 service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=embedding_llm,
+                                               embed_model=embeddings,
                                                callback_manager = callback_manager 
                                                )
 
@@ -296,7 +263,7 @@ index = VectorStoreIndex.from_documents(documents)
 # Lets have a quick look at the embeddings
 
 text_obj = [document.text for document in documents]
-encoded_chunks = [azure_openai_embedding.embed_query(document_text) for document_text in text_obj]
+encoded_chunks = [embeddings.embed_query(document_text) for document_text in text_obj]
 vector_chunks = np.array(encoded_chunks, dtype=np.float32)
 vector_chunks /= np.linalg.norm(vector_chunks, axis=1)[:, np.newaxis]
 
@@ -325,23 +292,23 @@ displayHTML(html)
 
 # COMMAND ----------
 
-# MAGIC TODO BIER comparison of embedding algorithms
+# MAGIC %md TODO BIER comparison of embedding algorithms
 
 # COMMAND ----------
 
 # DBTITLE 1,Create Sample Questions
+import nest_asyncio
+nest_asyncio.apply()
 
 # and turning it into a query engine
 query_engine = index.as_query_engine()
 
 # this is the question generator. Note that it has additional settings to customise prompt etc
-data_generator = DatasetGenerator.from_documents(documents=documents)
+data_generator = DatasetGenerator.from_documents(documents=documents,
+                                                 service_context=service_context)
 
 # this is the call to generate the questions
 eval_questions = data_generator.generate_questions_from_nodes()
-
-
-
 
 # COMMAND ----------
 
@@ -377,6 +344,7 @@ dataset_df = pd.DataFrame(
 
 from llama_index.callbacks.open_inference_callback import as_dataframe
 
+callback_handler = OpenInferenceCallbackHandler()
 query_data_buffer = callback_handler.flush_query_data_buffer()
 sample_query_df = as_dataframe(query_data_buffer)
 sample_query_df

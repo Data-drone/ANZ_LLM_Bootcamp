@@ -356,7 +356,10 @@ class ModelServingEndpointEmbeddings(BaseModel, Embeddings):
         """
         #instruction_pairs = [(self.embed_instruction, text) for text in texts]
         #embeddings = self._embed(instruction_pairs)
-        embeddings = [self._embed(x)['predictions'][0] for x in texts]
+        try:
+            embeddings = [self._embed(x)['predictions'][0] for x in texts]
+        except KeyError:
+            print([self._embed(x) for x in texts])
 
         return embeddings
 
