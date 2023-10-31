@@ -215,7 +215,8 @@ pd_generation_result
 
 # Due to our bad chunking, some of the questions are pretty bad
 # We can do a basic filter
-filtered_result = pd_generation_result[pd_generation_result.str.len() >= 50]
+filtered_result = pd_generation_result[pd_generation_result['question'].str.len() >= 50]
+#filtered_result = filtered_result.drop([1])
 filtered_result
 
 # COMMAND ----------
