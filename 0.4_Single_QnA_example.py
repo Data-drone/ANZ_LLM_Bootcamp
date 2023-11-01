@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pypdf sentence_transformers chromadb==0.4.15 ctransformers==0.2.26
+# MAGIC %pip install pypdf sentence_transformers chromadb==0.4.15 ctransformers==0.2.26 llama_index==0.8.54
 
 # COMMAND ----------
 

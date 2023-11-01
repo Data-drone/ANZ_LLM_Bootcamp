@@ -25,7 +25,7 @@ run_mode = 'serving' # or gpu or cpu
 
 # COMMAND ----------
 
-pipe = load_model(run_mode, dbfs_tmp_cache)
+pipe = load_model(run_mode, dbfs_tmp_cache, 'zephyr_7b')
 
 # COMMAND ----------
 

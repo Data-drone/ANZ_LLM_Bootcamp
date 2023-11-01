@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-%pip install faiss-cpu wikipedia
+%pip install faiss-cpu wikipedia llama_index==0.8.54
 
 # COMMAND ----------
 
