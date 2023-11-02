@@ -229,7 +229,8 @@ print(result)
 
 # COMMAND ----------
 
-# MAGIC %md If you got the same result as we did in testing it might be total nonsense!
+# MAGIC %md LLMs have progressed a lot
+# MAGIC back with MPT-7b we got total nonsense like the below
 # MAGIC
 # MAGIC ```
 # MAGIC The document.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\
@@ -246,6 +247,7 @@ print(result)
 # MAGIC
 # MAGIC There are a few different things that we can to fix this.
 # MAGIC First, langchain defaults to prompts tuned on OpenAI ChatGPT by default  
+# MAGIC But newer models like we are using now run fine
 # COMMAND ----------
 
 from langchain import PromptTemplate
@@ -260,6 +262,19 @@ Based on the following context:
 
 Answer the following question:
 {question}[/INST]
+"""
+
+zephyr_template = """<|system|>
+As a helpful assistant, answer questions from users but be polite and concise. If you don't know say I don't know.
+
+Based on the following context:
+
+{context}
+
+<|user|>
+{question}
+
+<|assistant|>
 """
 
 # prompt templates in langchain need the input variables specified it can then be loaded in the string
@@ -341,7 +356,12 @@ texts = text_splitter.split_documents(pages)
 docsearch = Chroma.from_documents(texts, embeddings, persist_directory=chroma_local_folder)
 
 ## Whilst we can archive Chroma files onto dbfs, the working files must be on a local SSD like local_disk0
-shutil.copytree(chroma_local_folder, chroma_archive_folder)
+try:
+  shutil.copytree(chroma_local_folder, chroma_archive_folder)
+
+except FileExistsError:
+  shutil.rmtree(chroma_local_folder)
+  shutil.copytree(chroma_archive_folder, chroma_local_folder)
 
 # COMMAND ----------
 
@@ -442,7 +462,8 @@ model = LangchainQABot(model_uri, db_token, system_template, chroma_archive_fold
 with mlflow.start_run() as run:
   mlflow_result = mlflow.pyfunc.log_model(
       python_model = model,
-      extra_pip_requirements = ['llama_index==0.8.54'],
+      extra_pip_requirements = ['llama_index==0.8.54',
+                                'chromadb==0.4.15'],
       artifact_path = 'langchain_pyfunc'
   )
 

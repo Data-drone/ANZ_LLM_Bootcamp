@@ -6,6 +6,14 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install llama_index==0.8.54
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 import os
 import requests
 
@@ -149,7 +157,8 @@ for lib_name in repo_list.keys():
     for name in list_repo_files(repo_list[lib_name]):
         # skip all the safetensors data as we aren't using it and it's time consuming to download
         if "safetensors" in name:
-            if lib_name in ['llama_2_awq', 'llama_2_13b_awq', 'vicuna_1.5_13b_awq']:
+            if lib_name in ['llama_2_awq', 'llama_2_13b_awq', 'vicuna_1.5_13b_awq', 
+                            'mistral_7b_instruct', 'mistral_7b', 'zephyr_7b']:
                 pass
             else:
                 continue
