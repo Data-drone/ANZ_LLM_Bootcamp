@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-%pip install faiss-cpu wikipedia
+%pip install faiss-cpu wikipedia llama_index==0.8.54
 
 # COMMAND ----------
 
@@ -59,8 +59,8 @@ len(page.content.split())
 # COMMAND ----------
 from transformers import AutoTokenizer
 
-model_id = 'mosaicml/mpt-7b'
-model_revision = '72e5f594ce36f9cabfa2a9fd8f58b491eb467ee7'
+model_id = 'HuggingFaceH4/zephyr-7b-beta'
+model_revision = '3bac358730f8806e5c3dc7c7e19eb36e045bf720'
 tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
 
 
