@@ -67,7 +67,7 @@ browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
 db_host = f"https://{browser_host}"
 db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
-serving_uri = 'vicuna_13b'
+serving_uri = 'zephyr_7b'
 serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
 
 embedding_uri = 'brian_embedding_endpoint'

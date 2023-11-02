@@ -7,7 +7,7 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Install ctransformers for CPU inference
+# DBTITLE 1,Library Setup
 # MAGIC #%pip install ctransformers==0.2.26
 # MAGIC %pip install mlflow==2.8.0 llama_index==0.8.54
 # COMMAND ----------
@@ -101,6 +101,15 @@ Text: I think the vacation is okay.
 Sentiment: [/INST]
 """
 
+zephyr_prompt = """<|system|>
+Classify the text into neutral, negative or positive.
+
+<|user|>
+Text: I think the vacation is okay.
+Sentiment: 
+<|assistant|> 
+"""
+
 output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
@@ -120,6 +129,17 @@ The minutes from the Fed's June 13-14 meeting show that while almost all officia
 
 User Question: What is the interest rate in following paragraph?
 Answer: [/INST]
+"""
+
+zephyr_prompt = """<|assistant|>
+Provide an answer to the question based on the following:
+
+The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
+
+<|user|>
+User Question: What is the interest rate in following paragraph?
+Answer:
+<|assistant|>
 """
 
 output = pipe([prompt], max_tokens=100)
@@ -149,6 +169,21 @@ Question:
 What account would you recommend a small business?[/INST]
 """
 
+zephyr_prompt = """<|system|>
+Be helpful and suggest a type of account for a customer.
+
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+Question:
+<|user|>
+What account would you recommend a small business?[/INST]
+
+<|assistant|>
+"""
+
 output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
 print(str_output)
@@ -167,6 +202,21 @@ A tech unicorn deserves a special VC account
 
 Question:
 What account would you recommend a bob the builder?[/INST]
+"""
+
+zephyr_prompt = """<|system|>
+Be helpful and suggest a type of account for a customer.
+
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+Question:
+<|user|>
+What account would you recommend a bob the builder?
+
+<|assistant|>
 """
 
 output = pipe([prompt], max_tokens=100)
@@ -206,6 +256,26 @@ Based on the above provide the answer to the following question.
 Question:
 {user_question}[/INST]
 """
+
+zephyr_prompt = f"""
+<|system|>
+Provide helpful responses and guide the customers.     
+
+The follow example shows how to answer:
+Question:
+I went to the market and bought 10 apples. 
+I gave 2 apples to the neighbor and 2 to the repairman. 
+I then went and bought 5 more apples and ate 1. 
+
+Answer:
+The answer is 10
+
+Based on the above provide the answer to the following question.
+<|user|>
+{user_question}
+<|assistant|>
+"""
+
 
 output = pipe([prompt], max_tokens=100)
 str_output = string_printer(output, run_mode)
@@ -272,6 +342,21 @@ Question:
 {user_question}[/INST]
 """
 
+zephyr_prompt  = f"""
+<|system|>
+{system_prompt}
+    
+Here are some examples:
+A consumer wants a savings account
+A business wants a business account
+A tech unicorn deserves a special VC account
+
+<|user|>
+{user_question}
+
+<|assistant|>
+"""
+
 output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
@@ -290,6 +375,14 @@ prompt = f"""
 
 Question:
 {user_question}[/INST]
+"""
+
+zehpyr_prompt = f"""<|system|>
+{system_prompt}
+
+<|user|>
+{user_question}
+<|assistant|>
 """
 
 output = pipe([prompt], max_tokens=500)
@@ -352,6 +445,14 @@ Question:
 {user_question}[/INST]
 """
 
+zephyr_prompt = f"""<|system|>
+{system_prompt}
+
+<|user|>
+{user_question}
+<|assistant|>
+"""
+
 output = pipe([prompt], max_tokens=250)
 str_output = string_printer(output, run_mode)
 print(str_output)
@@ -370,6 +471,19 @@ LK-99 is a potential room-temperature superconductor with a gray‒black appeara
 
 Provide an answer to the following:
 {user_question}[/INST]
+"""
+
+zephyr_prompt = f"""<|system|>{system_prompt}
+
+Based on the below context:
+
+LK-99 is a potential room-temperature superconductor with a gray‒black appearance.[2]: 8  It has a hexagonal structure slightly modified from lead‒apatite, by introducing small amounts of copper. A room-temperature superconductor is a material that is capable of exhibiting superconductivity at operating temperatures above 0 °C (273 K; 32 °F), that is, temperatures that can be reached and easily maintained in an everyday environment.
+
+Provide an answer to the following:
+<|user|>
+{user_question}
+
+<|assistant|>
 """
 
 output = pipe([prompt], max_tokens=250)

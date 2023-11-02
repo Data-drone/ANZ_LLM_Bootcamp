@@ -47,7 +47,7 @@ len(page.content.split())
 
 # MAGIC %md
 # MAGIC # Load Embedding Model
-# MAGIC In this example, we will use the tokeniser from MPT-7B to start
+# MAGIC In this example, we will use the tokeniser from zephyr-7b to start
 # MAGIC 
 # MAGIC *NOTE* When we build out our full architecture there will be two functions that turn text to tokens.
 # MAGIC - Model Tokenizer - This component we are experimenting with here
