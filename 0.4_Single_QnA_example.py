@@ -5,7 +5,8 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pypdf sentence_transformers chromadb==0.4.15 ctransformers==0.2.26 llama_index==0.8.54
+# MAGIC # ctransformers==0.2.26
+# MAGIC %pip install pypdf sentence_transformers chromadb==0.4.15  llama_index==0.8.54
 
 # COMMAND ----------
 
@@ -97,6 +98,7 @@ texts[1]
 
 # COMMAND ----------
 
+
 embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
                                    model_kwargs={'device': 'cpu'})
 docsearch = Chroma.from_documents(texts, embeddings)
@@ -183,7 +185,7 @@ except NameError:
   if run_mode == 'serving':
 
     ## the Langchain Databricks LLM definition is currently not compatible with Optimised Serving
-    serving_uri = 'vicuna_13b'
+    serving_uri = 'zephyr_7b'
     browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
     db_host = f"https://{browser_host}"
     model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
@@ -191,7 +193,7 @@ except NameError:
 
     llm_model = ServingEndpointLLM(endpoint_url=model_uri, token=db_token)
   else:
-    pipe = load_model(run_mode, dbfs_tmp_cache, 'vicuna_13b')
+    pipe = load_model(run_mode, dbfs_tmp_cache, 'zephyr_7b')
     llm_model = HuggingFacePipeline(pipeline=pipe)
 
 else:
@@ -440,7 +442,7 @@ model = LangchainQABot(model_uri, db_token, system_template, chroma_archive_fold
 with mlflow.start_run() as run:
   mlflow_result = mlflow.pyfunc.log_model(
       python_model = model,
-      extra_pip_requirements = ['langchain==0.0.267'],
+      extra_pip_requirements = ['llama_index==0.8.54'],
       artifact_path = 'langchain_pyfunc'
   )
 

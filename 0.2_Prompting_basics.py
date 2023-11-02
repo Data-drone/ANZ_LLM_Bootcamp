@@ -9,7 +9,7 @@
 
 # DBTITLE 1,Install ctransformers for CPU inference
 # MAGIC #%pip install ctransformers==0.2.26
-# MAGIC  install mlflow==2.8.0 llama_index==0.8.54
+# MAGIC %pip install mlflow==2.8.0 llama_index==0.8.54
 # COMMAND ----------
 
 dbutils.library.restartPython()
