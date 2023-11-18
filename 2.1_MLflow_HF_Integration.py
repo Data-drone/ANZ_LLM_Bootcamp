@@ -5,12 +5,15 @@
 # MAGIC
 # MAGIC Most organisations do not want to have workspaces permanently open to huggingface.co \
 # MAGIC We can leverage MLflow in order to log and store models
+# MAGIC The approach with huggingface model and embedding model is slightly different so we will use different notebooks
 # MAGIC NOTE - We don't even need a GPU instance in order to go through and do logging
 
 # COMMAND ----------
 
-# DBTITLE 1,Install Note GPU Only
+# DBTITLE 1,Library Install
 # Mistral model is only supported with transformers 4.34.1 and above
+# We need mlflow 2,8,0 for latest LLM Updates
+## TODO Peft configs?
 %pip install -U mlflow==2.8.0 transformers==4.34.1 accelerate==0.23.0 llama_index==0.8.54
 
 # COMMAND ----------
@@ -22,6 +25,13 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
+# MAGIC %md ## Load Model
+# MAGIC As long as we don't use the model for inference it is fine to just load with CPU
+# MAGIC If we did want to test the model out first we would need to setup GPU properly
+# MAGIC We haven't set `device_map` because it glitches with mlflow logging so GPU won't work
+
+# COMMAND ----------
+
 from transformers import (
    AutoModelForCausalLM,
    AutoTokenizer,
@@ -30,13 +40,15 @@ from transformers import (
 )
 import mlflow
 from mlflow.models import infer_signature
-from mlflow.transformers import generate_signature_output
 import torch
 import os
 
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up the model
+# For most bootcamps we cache the models that we need first
+# this code sets huggingface to retrieve model from cache
+# We can use llama from marketplace so we just log zephyr
 model_name = 'zephyr_7b'
 cached_model_files = f'{bootcamp_dbfs_model_folder}/{model_name}'
 
@@ -45,7 +57,7 @@ tokenizer = AutoTokenizer.from_pretrained(cached_model_files, cache_dir=dbfs_tmp
 model_config = AutoConfig.from_pretrained(cached_model_files)
 model = AutoModelForCausalLM.from_pretrained(cached_model_files,
                                                config=model_config,
-                                               #device_map='auto',
+                                               #device_map='auto', # disabled for mlflow compatability
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
                                                cache_dir=dbfs_tmp_cache
                                               )
@@ -56,13 +68,21 @@ pipe = pipeline(
 # COMMAND ----------
 
 # DBTITLE 1,Creating Sample Data and defining the schema for the signature
-example_sentences = ["<s>[INST]<<SYS>>Answer questions succintly<</SYS>> Who are you?[/INST]", 
-                    "<s>[INST]<<SYS>>Answer questions succintly<</SYS>> How can you help me?[/INST]"]
+# This is in llama format
+#example_sentences = ["<s>[INST]<<SYS>>Answer questions succintly<</SYS>> Who are you?[/INST]", 
+#                    "<s>[INST]<<SYS>>Answer questions succintly<</SYS>> How can you help me?[/INST]"]
+
+# This is in zephyr format
+example_sentences = ["<|system|>Answer questions succintly <|user|>Who are you?", 
+                    "<|system|>Answer questions succintly <|user|>How can you help me?"]
+
 
 # To use the generate signature we need to do inference on the model which can be slow
-data = "MLflow is great!"
+
+# we disable generate_signature as that runs the model and it will be slow on cpu
+# The key is the format so even though these strings are fake it is fine
 #output = generate_signature_output(pipe, example_sentences)
-signature = infer_signature([data], ['Yay for ml'])
+signature = infer_signature(["MLflow is great!"], ['Yay for ml'])
 
 
 # COMMAND ----------
@@ -137,4 +157,13 @@ with mlflow.start_run(run_name=run_name) as run:
         metadata = {"task": "llm/v1/completions"},
         registered_model_name = register_name
     )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Discussion
+# MAGIC Logging Models into UC is the best way to govern them
+# MAGIC There can be scenarios where we want to load again from huggingface
+# MAGIC
+# MAGIC ie getting rid of bfloat16
 
