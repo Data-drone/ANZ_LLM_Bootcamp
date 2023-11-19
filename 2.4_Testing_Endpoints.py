@@ -37,11 +37,6 @@ workload_type = "CPU"
 # we to deploy the API Endpoint
 serving_client = EndpointApiClient()
 
-embedding_model = f''
-
-# Start the enpoint using the REST API (you can do it using the UI directly)
-latest_model = .latest_versions[0].version 
-
 serving_client.create_endpoint_if_not_exists(endpoint_name, 
                                             model_name = base_model_name, 
                                             model_version = client.get_registered_model(base_model_name).latest_versions[0].version , 
@@ -55,7 +50,10 @@ serving_client.create_endpoint_if_not_exists(endpoint_name,
 
 # setup config variables
 # embedding model
-embed_path = 'https://e2-demo-field-eng.cloud.databricks.com/serving-endpoints/brian_embedding_endpoint/invocations'
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+
+embed_path = f'{db_host}/serving-endpoints/{endpoint_name}/invocations'
 
 # COMMAND ----------
 
