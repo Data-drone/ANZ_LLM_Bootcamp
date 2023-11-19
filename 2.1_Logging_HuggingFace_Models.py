@@ -5,14 +5,16 @@
 # MAGIC
 # MAGIC Most organisations do not want to have workspaces permanently open to huggingface.co \
 # MAGIC We can leverage MLflow in order to log and store models
-# MAGIC NOTE
-# MAGIC - 7b can be logged with single G5
-# MAGIC - 13b 
+# MAGIC The approach with huggingface model and embedding model is slightly different so we will use different notebooks
+# MAGIC NOTE - We don't even need a GPU instance in order to go through and do logging
 
 # COMMAND ----------
 
-# DBTITLE 1,Install Note GPU Only
-%pip install -U mlflow==2.7.1 transformers==4.33.1 accelerate==0.23.0
+# DBTITLE 1,Library Install
+# Mistral model is only supported with transformers 4.34.1 and above
+# We need mlflow 2,8,0 for latest LLM Updates
+## TODO Peft configs?
+%pip install -U mlflow==2.8.0 transformers==4.34.1 accelerate==0.23.0 llama_index==0.8.54
 
 # COMMAND ----------
 
@@ -20,6 +22,13 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 # MAGIC %run ./utils
+
+# COMMAND ----------
+
+# MAGIC %md ## Load Model
+# MAGIC As long as we don't use the model for inference it is fine to just load with CPU
+# MAGIC If we did want to test the model out first we would need to setup GPU properly
+# MAGIC We haven't set `device_map` because it glitches with mlflow logging so GPU won't work
 
 # COMMAND ----------
 
@@ -31,22 +40,24 @@ from transformers import (
 )
 import mlflow
 from mlflow.models import infer_signature
-from mlflow.transformers import generate_signature_output
 import torch
 import os
 
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up the model
-model = 'llama_2_13b'
-cached_model_files = f'{bootcamp_dbfs_model_folder}/{model}'
+# For most bootcamps we cache the models that we need first
+# this code sets huggingface to retrieve model from cache
+# We can use llama from marketplace so we just log zephyr
+model_name = 'zephyr_7b'
+cached_model_files = f'{bootcamp_dbfs_model_folder}/{model_name}'
 
 tokenizer = AutoTokenizer.from_pretrained(cached_model_files, cache_dir=dbfs_tmp_cache)
 
 model_config = AutoConfig.from_pretrained(cached_model_files)
 model = AutoModelForCausalLM.from_pretrained(cached_model_files,
                                                config=model_config,
-                                               #device_map='auto',
+                                               #device_map='auto', # disabled for mlflow compatability
                                                torch_dtype=torch.bfloat16, # This will only work A10G / A100 and newer GPUs
                                                cache_dir=dbfs_tmp_cache
                                               )
@@ -56,17 +67,28 @@ pipe = pipeline(
         )
 # COMMAND ----------
 
-# DBTITLE 1,Verify Pipeline Working
-example_sentences = ["<s>[INST]<<SYS>>Answer questions succintly<</SYS>> Who are you?[/INST]", 
-                    "<s>[INST]<<SYS>>Answer questions succintly<</SYS>> How can you help me?[/INST]"]
+# DBTITLE 1,Creating Sample Data and defining the schema for the signature
+# This is in llama format
+#example_sentences = ["<s>[INST]<<SYS>>Answer questions succintly<</SYS>> Who are you?[/INST]", 
+#                    "<s>[INST]<<SYS>>Answer questions succintly<</SYS>> How can you help me?[/INST]"]
 
-for sentence in example_sentences:
-   print(pipe(sentence, max_new_tokens=256))
+# This is in zephyr format
+example_sentences = ["<|system|>Answer questions succintly <|user|>Who are you?", 
+                    "<|system|>Answer questions succintly <|user|>How can you help me?"]
+
+
+# To use the generate signature we need to do inference on the model which can be slow
+
+# we disable generate_signature as that runs the model and it will be slow on cpu
+# The key is the format so even though these strings are fake it is fine
+#output = generate_signature_output(pipe, example_sentences)
+signature = infer_signature(["MLflow is great!"], ['Yay for ml'])
+
 
 # COMMAND ----------
 
 # DBTITLE 1,Configure Experiment
-experiment_name = f'/Users/{username}/{model}'
+experiment_name = f'/Users/{username}/{model_name}'
 try:
   mlflow.create_experiment(experiment_name)
 except mlflow.exceptions.RestException:
@@ -75,13 +97,13 @@ except mlflow.exceptions.RestException:
 mlflow.set_experiment(experiment_name)
 
 # setup model experiment details
-run_name = model
+run_name = model_name
 
 # UC Catalog Settings
 use_uc = True
 catalog = 'bootcamp_ml'
 db = 'rag_chatbot'
-uc_model_name = f'{model}_inference_model'
+uc_model_name = f'{model_name}_inference_model'
 
 artifact_path = "transformers_pipeline"
 
@@ -104,7 +126,6 @@ if not use_uc:
    ## NOTE ## This problem goes away with UC
    os.environ['AWAIT_REGISTRATION_FOR'] = 900
 
-
 # Model Examples
 
 # Setting up generation parameters
@@ -120,12 +141,10 @@ inference_config = {
     "use_cache": True
 }
 
-data = "MLflow is great!"
-output = generate_signature_output(pipe, example_sentences)
-signature = infer_signature(data, output)
 
 # See: https://mlflow.org/docs/latest/python_api/mlflow.transformers.html#mlflow.transformers.log_model
 # If we set registered_model_name then log will register too. Otherwise we can use the following line
+# The extra metadata is how we switch to optimised serving
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.transformers.log_model(
         transformers_model=pipe,
@@ -133,9 +152,18 @@ with mlflow.start_run(run_name=run_name) as run:
         inference_config=inference_config,
         input_example=example_sentences,
         signature=signature,
-        extra_pip_requirements=['transformers==4.33.1',
+        extra_pip_requirements=['transformers==4.34.1',
                                 'accelerate==0.23.0'],
         metadata = {"task": "llm/v1/completions"},
         registered_model_name = register_name
     )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Discussion
+# MAGIC Logging Models into UC is the best way to govern them
+# MAGIC There can be scenarios where we want to load again from huggingface
+# MAGIC
+# MAGIC ie getting rid of bfloat16
 

@@ -1,42 +1,49 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Creating Serving Endpoints and Testing
+# MAGIC # MLflow logging for embedding models
+# MAGIC Embedding models use sentence transformers which are different
+
+# COMMAND ----------
+
+%pip install -U mlflow==2.8.0 llama_index==0.8.54
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 from sentence_transformers import SentenceTransformer
 import mlflow
 # COMMAND ----------
 
-username = spark.sql("SELECT current_user()").first()['current_user()']
+dbutils.library.restartPython()
+# COMMAND ----------
 
 model_name='sentence-transformers/all-mpnet-base-v2'
 
 # UC Catalog Settings
 use_uc = True
-catalog = 'brian_ml'
+catalog = 'bootcamp_ml'
 db = 'rag_chatbot'
-uc_model_name = 'hf_embedding_model'
+base_model_name = 'mpnet_base_embedding_model'
 
 # mlflow settings
 experiment_name = f'/Users/{username}/rag_llm_embedding'
 run_name = 'embedding_model'
 artifact_path = 'embedding_model'
 
-# model serving settings
-endpoint_name = 'brian_embedding_endpoint'
-workload_sizing = 'Small'
-
-# With GPU Private preview will have: workload_type
-# {“CPU”, “GPU_MEDIUM”, “MULTIGPU_MEDIUM”} (AWS) 
-# {“CPU”, “GPU_SMALL”, “GPU_LARGE”} (Azure)
-workload_type = "CPU"
-
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC -- we need to make sure that the schemas exist
-# MAGIC CREATE CATALOG IF NOT EXISTS brian_ml;
-# MAGIC CREATE SCHEMA IF NOT EXISTS brian_ml.rag_chatbot;
+# DBTITLE 1,Set up UC Settings
+if use_uc:
+   spark.sql(f'CREATE CATALOG IF NOT EXISTS {catalog}')
+   spark.sql(f'CREATE SCHEMA IF NOT EXISTS {catalog}.{db}')
+
+   mlflow.set_registry_uri('databricks-uc')
+
+   model_path = f"{catalog}.{db}.{base_model_name}"
+else:
+   model_path = base_model_name
 
 # COMMAND ----------
 
@@ -51,10 +58,6 @@ example_sentences = ["welcome to sentence transformers",
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up the mlflow experiment
-#Enable Unity Catalog with mlflow registry
-if use_uc:
-  mlflow.set_registry_uri('databricks-uc')
-
 try:
   mlflow.create_experiment(experiment_name)
 except mlflow.exceptions.RestException:
@@ -79,12 +82,7 @@ with mlflow.start_run(run_name=run_name) as run:
 
 # DBTITLE 1,Register Model
 
-# /Users/odl_instructor_685544@databrickslabs.com/rag_llm_embedding
 # We need to know the Run id first. When running this straight then we can extract the run_id
-if use_uc:
-   model_path = f"{catalog}.{db}.{uc_model_name}"
-else:
-   model_path = uc_model_name
 
 latest_model = mlflow.register_model(f'runs:/{run.info.run_id}/{artifact_path}', 
                                      model_path)
@@ -95,20 +93,5 @@ client.set_registered_model_alias(name=model_path,
 
 # COMMAND ----------
 
-%run ./endpoint_utils
-
-# COMMAND ----------
-
-# DBTITLE 1,Deploy Endpoint
-
-# we to deploy the API Endpoint
-serving_client = EndpointApiClient()
-
-# Start the enpoint using the REST API (you can do it using the UI directly)
-
-serving_client.create_endpoint_if_not_exists(endpoint_name, 
-                                            model_name=model_path, 
-                                            model_version = latest_model.version, 
-                                            workload_size=workload_sizing,
-                                            workload_type=workload_type
-                                            )
+# MAGIC %md
+# MAGIC # 
