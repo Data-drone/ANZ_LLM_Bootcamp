@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Let us deploy and leverage UC Endpoints
+# MAGIC # Let us deploy and leverage Databricks Model Serving Endpoints
 # MAGIC
 
 # COMMAND ----------
@@ -9,12 +9,17 @@
 # COMMAND ----------
 
 import requests
+from mlflow import MlflowClient
 
-# COMMAND ----------
+mlflow.set_registry_uri('databrick-uc')
+client = MlflowClient()
 
-## TEMP ###
-# model serving settings
+catalog = 'bootcamp_ml'
+db = 'rag_chatbot'
+
+# embedding model
 endpoint_name = 'brian_embedding_endpoint'
+base_model_name = f'{catalog}.{db}.mpnet_base_embedding_model'
 workload_sizing = 'Small'
 
 # With GPU Private preview will have: workload_type
@@ -32,13 +37,16 @@ workload_type = "CPU"
 # we to deploy the API Endpoint
 serving_client = EndpointApiClient()
 
+embedding_model = f''
+
 # Start the enpoint using the REST API (you can do it using the UI directly)
+latest_model = .latest_versions[0].version 
 
 serving_client.create_endpoint_if_not_exists(endpoint_name, 
-                                            model_name=model_path, 
-                                            model_version = latest_model.version, 
-                                            workload_size=workload_sizing,
-                                            workload_type=workload_type
+                                            model_name = base_model_name, 
+                                            model_version = client.get_registered_model(base_model_name).latest_versions[0].version , 
+                                            workload_size = workload_sizing,
+                                            workload_type = workload_type
                                             )
 
 
