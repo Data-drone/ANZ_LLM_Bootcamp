@@ -221,6 +221,9 @@ from langchain.pydantic_v1 import BaseModel, Extra, root_validator
 from langchain.schema.embeddings import Embeddings
 from langchain.utils import get_from_dict_or_env
 
+browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+db_host = f"https://{browser_host}"
+        
 
 class ModelServingEndpointEmbeddings(BaseModel, Embeddings):
     """Databricks Model Serving embedding service.
@@ -243,7 +246,7 @@ class ModelServingEndpointEmbeddings(BaseModel, Embeddings):
     """
 
     endpoint_url: str = (
-        "https://dbc-d0c4038e-c5a9.cloud.databricks.com/serving-endpoints/brian_embedding_endpoint/invocations"
+        f"{db_host}/serving-endpoints/mpnet_embedding_endpoint/invocations"
     )
     """Endpoint URL to use."""
     embed_instruction: str = "Represent the document for retrieval: "
