@@ -417,6 +417,9 @@ class LangchainQABot(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
+
+# **NOTE** This doesn't deploy properly as a model serving model yet
+# Due to some bug in the code
 db_token = '<redacted>'
 
 catalog = 'bootcamp_ml'
@@ -437,8 +440,7 @@ with mlflow.start_run() as run:
   mlflow_result = mlflow.pyfunc.log_model(
       python_model = model,
       extra_pip_requirements = ['llama_index==0.8.54',
-                                'chromadb==0.4.17',
-                                'mlflow==2.8.0'],
+                                'chromadb==0.4.17'],
       artifacts = {
          'chroma_db': chroma_local_folder
       },
