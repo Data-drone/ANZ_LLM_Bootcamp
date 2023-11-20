@@ -198,10 +198,13 @@ class LangchainChatBot(mlflow.pyfunc.PythonModel):
         self.llm_chain = LLMChain(
             llm=chat_gateway,
             prompt=ChatPromptTemplate.from_messages([
-                ("system", "You are an unhelpful bot called Bossy that speaks in Korean"),
+                ("system", "You are a personal assistant who tries to help everyone"),
                 ("human", "{user_input}")
             ])
         )
+
+    def process_row(self, row):
+        return self.llm_chain.run(user_input=row['prompt'])
 
     def predict(self, context, data):
         import os
