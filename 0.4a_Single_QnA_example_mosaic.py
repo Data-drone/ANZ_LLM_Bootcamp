@@ -2,10 +2,11 @@
 # MAGIC %md
 # MAGIC # Building a Q&A Knowledge Base - Part 1
 # MAGIC Questioning one document
+# MAGIC
+# MAGIC This version uses mlflow gateway endpoints
 
 # COMMAND ----------
 
-# MAGIC # ctransformers==0.2.26
 # MAGIC %pip install pypdf sentence_transformers chromadb==0.4.17 llama_index==0.8.54 mlflow==2.8.0
 
 # COMMAND ----------
@@ -22,6 +23,7 @@ from langchain.chains import RetrievalQA
 from langchain.document_loaders import PyPDFLoader
 from langchain import HuggingFacePipeline
 from langchain.llms import HuggingFaceHub
+import chromadb
 
 # Manual Model building
 from transformers import pipeline
@@ -30,7 +32,7 @@ from transformers import pipeline
 
 # MAGIC %md
 # MAGIC In this example we will load up a single pdf and ask questions and answers of it.
-# MAGIC Most examples use OpenAI here we wil try out Llama v2.
+# MAGIC We will use an External Model via mlflow gateway as our llm and embedding service
 # MAGIC
 # MAGIC Ours goal is twofold:
 # MAGIC - Find a way to convert our source data into useful snippets that can be inserted into prompts as context
@@ -42,11 +44,6 @@ from transformers import pipeline
 
 # DBTITLE 1,Setup dbfs folder paths
 # MAGIC %run ./utils
-
-# COMMAND ----------
-
-# can also set to gpu
-run_mode = 'serving' # 'gpu'
 
 # COMMAND ----------
 
@@ -92,16 +89,42 @@ texts[1]
 # MAGIC
 # MAGIC ### Setup Chromadb
 # MAGIC
-# MAGIC We utilise the ```HuggingFaceEmbeddings()``` from LangChain which defaults to ```sentence-transformers/all-mpnet-base-v2``` to generate our text embeddings. However, note that Chroma can handle tokenization, embedding, and indexing automatically for you. If you would like to change the embedding model, read [here on how to do that](https://docs.trychroma.com/embeddings). You will need instantiate the ```collection``` yourself instead of using the LangChain wrapper.
+# MAGIC We utilise the `HuggingFaceEmbeddings()` from LangChain which defaults to `sentence-transformers/all-mpnet-base-v2` to generate our text embeddings. However, note that Chroma can handle tokenization, embedding, and indexing automatically for you. If you would like to change the embedding model, read [here on how to do that](https://docs.trychroma.com/embeddings). You will need instantiate the ```collection``` yourself instead of using the LangChain wrapper.
 # MAGIC
 # MAGIC You can read the documentate [here](https://python.langchain.com/docs/modules/data_connection/vectorstores/integrations/chroma) to learn more about how Chroma integrates with LangChain.
 
 # COMMAND ----------
 
+from langchain.embeddings.mlflow_gateway import MlflowAIGatewayEmbeddings
+from chromadb.config import Settings
+import uuid
 
-embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
-                                   model_kwargs={'device': 'cpu'})
-docsearch = Chroma.from_documents(texts, embeddings)
+chroma_local_folder = '/local_disk0/chromadb'
+chroma_archive_folder = f'/dbfs/Users/{username}/simple_chromadb'
+
+embeddings = MlflowAIGatewayEmbeddings(
+   gateway_uri="databricks",
+   route="mosaicml-instructor-xl-embeddings"
+)
+#embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
+#                                   model_kwargs={'device': 'cpu'})
+
+settings = Settings(
+   allow_reset=True
+)
+
+client = chromadb.PersistentClient(settings=settings, path=chroma_local_folder)
+client.reset()
+collection = client.create_collection('single_paper')
+
+docsearch = Chroma(
+   client=client,
+   collection_name='single_paper',
+   embedding_function=embeddings
+)
+
+for text in texts:
+   docsearch.add_texts(texts=[text.page_content])
 
 # we can verify that our docsearch index has objects in it with this
 print('The index includes: {} documents'.format(docsearch._collection.count()))
@@ -122,82 +145,33 @@ print(docs[0].page_content)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC Although we can get results from Chroma, it's often useful to metadata as well as ids to our partitions of texts (or embedding vectors). Often we don't want to query the entire vector database. This use-case is addressed below.
-
-# COMMAND ----------
-
-for i, t in enumerate(texts): 
-  if i % 2:
-    t.metadata = {"source": file_path}
-  else:
-    t.metadata = {"source": "Unknown"}
-
-print(texts[0].metadata)
-print(texts[1].metadata)
-
-# COMMAND ----------
-
-docsearch_metadata = (
-  Chroma.from_documents(
-    collection_name="single_paper",
-    documents=texts,
-    ids=[f"id{x}" for x in range(len(texts))],
-    embedding=HuggingFaceEmbeddings()
-  )
-)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Now we can query the vector store and filter on a specific metadata condition
-
-# COMMAND ----------
-
-docs = (
-  docsearch_metadata.similarity_search(
-    query="What do we call models that use reinforcement learning with human feedback?",
-    filter={"source": file_path})
-)
-
-print(f'Metadata of the document is: {docs[0].metadata}')
-print(f'Some text from the returned page: "{docs[0].page_content[0:50]}"')
-
-# COMMAND ----------
-
 # MAGIC %md 
-# MAGIC We can also query our Vector DB and retrieve a tuple of (result, score) so we can have a measure of confidence from the returned results. The returned value is a similarity score between the vector corresponding to the query and the vector for the returned document. Lower scores imply that the vectors are closer together and hence have higher relevance with the query vector.
+# MAGIC We can query our Vector DB and retrieve a tuple of (result, score) so we can have a measure of confidence from the returned results. The returned value is a similarity score between the vector corresponding to the query and the vector for the returned document. Lower scores imply that the vectors are closer together and hence have higher relevance with the query vector.
 
 # COMMAND ----------
 
-docs = docsearch_metadata.similarity_search_with_score("What do we call models that use reinforcement learning with human feedback?")
+docs = docsearch.similarity_search_with_score("What do we call models that use reinforcement learning with human feedback?")
 scores = [d[1] for d in docs]
 print(scores)
 
 # COMMAND ----------
 
-## One problem with the library at the moment is that GPU ram doesn't get relinquished when the object is overridden
-# The only way to clear GPU ram is to detach and reattach
-# This snippet will make sure we don't keep reloading the model and running out of GPU ram
-try:
-  llm_model
-except NameError:
-  if run_mode == 'serving':
+#We will use our External LLM to provide "the brains"
+from langchain.chat_models import ChatMLflowAIGateway
 
-    ## the Langchain Databricks LLM definition is currently not compatible with Optimised Serving
-    serving_uri = 'zephyr_7b'
-    browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
-    db_host = f"https://{browser_host}"
-    model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
-    db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+mosaic_chat_route_name = "mosaicml-llama2-70b-chat"
 
-    llm_model = ServingEndpointLLM(endpoint_url=model_uri, token=db_token)
-  else:
-    pipe = load_model(run_mode, dbfs_tmp_cache, 'zephyr_7b')
-    llm_model = HuggingFacePipeline(pipeline=pipe)
+llm_model = ChatMLflowAIGateway(
+    gateway_uri="databricks",
+    route=mosaic_chat_route_name,
+    params={
+        "temperature": 0.0,
+        "candidate_count": 2,
+        "stop": [""], # There is something weird with this param but this works for now
+        "max_tokens": 256
+    },
+)
 
-else:
-  pass
 
 # COMMAND ----------
 
@@ -337,25 +311,14 @@ import pandas as pd
 import shutil
 
 mlflow_dir = f'/Users/{username}/simple_rag_chain'
+mlflow.set_registry_uri('databricks-uc')
 mlflow.set_experiment(mlflow_dir)
 
 # COMMAND ----------
 
-# We need to save out our Chroma
-# Load and chunk
-file_to_load = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
+# We need to save out our Chroma database
 
-chroma_local_folder = '/local_disk0/chromadb'
-chroma_archive_folder = f'/dbfs/Users/{username}/simple_chromadb'
-
-loader = PyPDFLoader(file_to_load)
-pages = loader.load_and_split()
-text_splitter = CharacterTextSplitter(chunk_size=700, chunk_overlap=100)
-texts = text_splitter.split_documents(pages)
-
-docsearch = Chroma.from_documents(texts, embeddings, persist_directory=chroma_local_folder)
-
-## Whilst we can archive Chroma files onto dbfs, the working files must be on a local SSD like local_disk0
+# this will be deprecated
 try:
   shutil.copytree(chroma_local_folder, chroma_archive_folder)
 
@@ -378,32 +341,49 @@ testing_questions = pd.DataFrame(
 # COMMAND ----------
 
 # This is a custom wrapper allows us to log langchain to mlflow as a model
+# for logging the chroma artifacts we need to follow: 
+# https://docs.databricks.com/en/machine-learning/model-serving/model-serving-custom-artifacts.html
 class LangchainQABot(mlflow.pyfunc.PythonModel):
     
-    def __init__(self, model_uri, token, system_template, chroma_archive_dir:str=chroma_archive_folder):
-        self.model_uri = model_uri
+    def __init__(self, host, token, system_template, chroma_archive_dir:str=chroma_archive_folder):
+        self.host = host
         self.token = token
         self.system_template = system_template
         self.chroma_archive_dir = chroma_archive_dir
         self.chroma_local_dir = '/local_disk0/chromadb'
 
     def setup_retriever(self, context):
+        from langchain.embeddings.mlflow_gateway import MlflowAIGatewayEmbeddings
+        import chromadb
+
         try:
           shutil.copytree(context.artifacts['chroma_db'], self.chroma_local_dir)
         except FileExistsError:
           shutil.rmtree(self.chroma_local_dir)
           shutil.copytree(context.artifacts['chroma_db'], self.chroma_local_dir)
 
-        embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2',
-                                   model_kwargs={'device': 'cpu'})
-        doc_search = Chroma(persist_directory=self.chroma_local_dir, embedding_function=embeddings)
+        embeddings = MlflowAIGatewayEmbeddings(
+                        gateway_uri="databricks",
+                        route="mosaicml-instructor-xl-embeddings"
+                     )
+        
+        client = chromadb.PersistentClient(settings=settings, path=chroma_local_folder)
+        
+        doc_search = Chroma(client=client,
+                            collection_name='single_paper',
+                            persist_directory=self.chroma_local_dir, 
+                            embedding_function=embeddings
+                            )
+        
         return doc_search.as_retriever(search_kwargs={"k": 3})
 
     def load_context(self, context):
-        from typing import Any, List, Mapping, Optional
-        from langchain.callbacks.manager import CallbackManagerForLLMRun
-        from langchain.llms.base import LLM
-        import requests
+        from langchain.chat_models import ChatMLflowAIGateway
+        import os
+
+        # connecting to gateway requires that this is set
+        os.environ['DATABRICKS_HOST'] = self.host
+        os.environ['DATABRICKS_TOKEN'] = self.token
 
         self.retriever = self.setup_retriever(context)
 
@@ -411,42 +391,20 @@ class LangchainQABot(mlflow.pyfunc.PythonModel):
             input_variables=["question", "context"], template=self.system_template
         )
         
-        # Our class must be included as it is not pickleable
-        class ServingEndpointLLM(LLM):
-            endpoint_url: str
-            token: str
+        mosaic_chat_route_name = "mosaicml-llama2-70b-chat"
 
-            @property
-            def _llm_type(self) -> str:
-                return "custom"
+        llm_model = ChatMLflowAIGateway(
+            gateway_uri="databricks",
+            route=mosaic_chat_route_name,
+            params={
+                "temperature": 0.0,
+                "candidate_count": 2,
+                "stop": [""], # There is something weird with this param but this works for now
+                "max_tokens": 256
+            },
+        )
 
-            def _call(
-                self,
-                prompt: str,
-                stop: Optional[List[str]] = None,
-                run_manager: Optional[CallbackManagerForLLMRun] = None,
-                **kwargs: Any,
-            ) -> str:
-                if stop is not None:
-                    raise ValueError("stop kwargs are not permitted.")
-                
-                header = {"Context-Type": "text/json", "Authorization": f"Bearer {self.token}"}
-
-                dataset = {'inputs': {'prompt': [prompt]},
-                          'params': kwargs}
-
-                response = requests.post(headers=header, url=self.endpoint_url, json=dataset)
-
-                return response.json()['predictions'][0]['candidates'][0]['text']
-
-            @property
-            def _identifying_params(self) -> Mapping[str, Any]:
-                """Get the identifying parameters."""
-                return {"endpoint_url": self.endpoint_url} 
-    
-        llm = ServingEndpointLLM(endpoint_url=self.model_uri, token=self.token)
-
-        self.qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", 
+        self.qa = RetrievalQA.from_chain_type(llm=llm_model, chain_type="stuff", 
                                  retriever=self.retriever,
                                  chain_type_kwargs={"prompt": self.prompt_template})
     
@@ -459,11 +417,13 @@ class LangchainQABot(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
+db_token = '<redacted>'
+
 catalog = 'bootcamp_ml'
 schema = 'rag_chatbot'
 model_name = 'retrieval_chain'
 
-model = LangchainQABot(model_uri, db_token, system_template, chroma_archive_folder)
+model = LangchainQABot('https://adb-984752964297111.11.azuredatabricks.net/', db_token, system_template, chroma_archive_folder)
 
 user_input = "What is a tokenizer?"
 input_example = {"prompt": user_input}
@@ -477,9 +437,8 @@ with mlflow.start_run() as run:
   mlflow_result = mlflow.pyfunc.log_model(
       python_model = model,
       extra_pip_requirements = ['llama_index==0.8.54',
-                                'chromadb==0.4.15',
-                                'mlflow==2.8.0',
-                                'transformers==4.34.1'],
+                                'chromadb==0.4.17',
+                                'mlflow==2.8.0'],
       artifacts = {
          'chroma_db': chroma_local_folder
       },
