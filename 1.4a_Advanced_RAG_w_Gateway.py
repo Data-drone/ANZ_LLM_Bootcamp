@@ -7,7 +7,7 @@
 
 # DBTITLE 1,Extra Libs to install
 # ctransformers==0.2.26 
-%pip install pypdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.54 opencv-python chromadb==0.4.15
+%pip install pypdf unstructured["local-inference"] sqlalchemy 'git+https://github.com/facebookresearch/detectron2.git' poppler-utils scrapy llama_index==0.8.54 opencv-python chromadb==0.4.17
 
 # COMMAND ----------
 
@@ -58,7 +58,6 @@ from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
 
 chroma_local_folder = '/local_disk0/vector_store'
-chroma_archive_folder = f'/dbfs/Users/{username}/advanced_chromadb'
 print(f'Creating persistent db here: {chroma_local_folder}')
 chroma_client = chromadb.PersistentClient(path=chroma_local_folder)
 chroma_collection = chroma_client.get_or_create_collection("advanced_rag")
@@ -97,7 +96,7 @@ from llama_index import (
   set_global_service_context,
   LLMPredictor
 )
-from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
+from llama_index.callbacks import CallbackManager, LlamaDebugHandler
 from langchain.chat_models import ChatMLflowAIGateway
 
 # Using Databricks Model Serving
@@ -134,12 +133,19 @@ set_global_service_context(service_context)
 # COMMAND ----------
 
 # DBTITLE 1,Creating the Index
-from llama_index import VectorStoreIndex
+from llama_index import VectorStoreIndex, KnowledgeGraphIndex
 from langchain.vectorstores import Chroma
 
 index = VectorStoreIndex.from_documents(
     documents, storage_context=storage_context
 )
+
+# index = KnowledgeGraphIndex.from_documents(
+#     documents,
+#     max_triplets_per_chunk=2, 
+#     storage_context=storage_context,
+#     service_context=service_context
+# )
 
 # Query Data from the persisted index
 query_engine = index.as_query_engine()
