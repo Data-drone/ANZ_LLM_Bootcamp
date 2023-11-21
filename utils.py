@@ -37,6 +37,9 @@ linux_vector_store_directory = f'/dbfs{vector_store_path}'
 # is that right env var?
 os.environ['PERSIST_DIR'] = linux_vector_store_directory
 
+# gateway routes
+mosaic_chat_route_name = "mosaicml-llama2-70b-chat"
+
 # COMMAND ----------
 
 bootcamp_dbfs_model_folder = '/dbfs/bootcamp_data/hf_cache/downloads'
@@ -68,7 +71,30 @@ class QueryEndpoint:
       response = requests.post(headers=self.header, url=self.uri, json=dataset)
 
       return response.json()
+
+
+class QueryGateway:
+    """
+    A class for querying the gateway connection
+    """
+
+    def __init__(self, route:str):
+        self.route = route
+
+    def __call__(self, prompt: str):
+
+        format = {'messages': [{"role": "user", "content": prompt}]}
+
+        return gateway.query(route=self.route, 
+                                     data=format)
+
 # COMMAND ----------
+
+# This is to setup a connection for our model
+
+from mlflow import gateway
+
+gateway.set_gateway_uri(gateway_uri="databricks")
 
 def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b'):
     """
@@ -78,7 +104,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b
     from transformers import pipeline, AutoConfig
     import torch
 
-    assert run_mode in ['cpu', 'gpu', 'serving'], f'run_mode must be cpu, gpu or serving not {run_mode}'
+    assert run_mode in ['cpu', 'gpu', 'serving', 'gateway'], f'run_mode must be cpu/gpu/serving/gateway not {run_mode}'
 
     if run_mode == 'cpu':
 
@@ -126,6 +152,13 @@ def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b
         test_pipe = QueryEndpoint(model_uri, db_token)
 
         return test_pipe
+    
+    elif run_mode == 'gateway':
+
+        gateway_pipe = QueryGateway(mosaic_chat_route_name)
+
+        return gateway_pipe
+
 
 # COMMAND ----------
 
@@ -223,7 +256,8 @@ from langchain.utils import get_from_dict_or_env
 
 browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
 db_host = f"https://{browser_host}"
-        
+
+embedding_endpoint_name = 'brian_embedding_endpoint'
 
 class ModelServingEndpointEmbeddings(BaseModel, Embeddings):
     """Databricks Model Serving embedding service.
@@ -246,7 +280,7 @@ class ModelServingEndpointEmbeddings(BaseModel, Embeddings):
     """
 
     endpoint_url: str = (
-        f"{db_host}/serving-endpoints/mpnet_embedding_endpoint/invocations"
+        f"{db_host}/serving-endpoints/{embedding_endpoint_name}/invocations"
     )
     """Endpoint URL to use."""
     embed_instruction: str = "Represent the document for retrieval: "
