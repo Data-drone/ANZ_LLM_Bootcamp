@@ -53,7 +53,7 @@ except:
 # COMMAND ----------
 
 # DBTITLE 1,Testing Embedding Endpoint
-embedding_route.query(route='mosaicml-instructor-xl-embeddings', data={"text": ["test"]})
+gateway.query(route='mosaicml-instructor-xl-embeddings', data={"text": ["test"]})
 
 # COMMAND ----------
 
@@ -80,7 +80,7 @@ except:
 # COMMAND ----------
 
 # DBTITLE 1,Testing Embedding Endpoint
-chat_route.query(route='mosaicml-llama2-70b-chat', data={"messages": [{"role": "user", "content": "I am sad"}]})
+gateway.query(route='mosaicml-llama2-70b-chat', data={"messages": [{"role": "user", "content": "I am sad"}]})
 
 # COMMAND ----------
 
