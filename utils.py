@@ -144,7 +144,7 @@ def load_model(run_mode: str, dbfs_cache_dir: str, serving_uri :str='llama_2_13b
     
     elif run_mode == 'serving':
         
-        browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+        browser_host = spark.conf.get("spark.databricks.workspaceUrl")
         db_host = f"https://{browser_host}"
         model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
         db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
@@ -254,7 +254,7 @@ from langchain.pydantic_v1 import BaseModel, Extra, root_validator
 from langchain.schema.embeddings import Embeddings
 from langchain.utils import get_from_dict_or_env
 
-browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+browser_host = spark.conf.get("spark.databricks.workspaceUrl")
 db_host = f"https://{browser_host}"
 
 embedding_endpoint_name = 'brian_embedding_endpoint'
