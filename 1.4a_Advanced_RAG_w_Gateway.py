@@ -79,6 +79,10 @@ documents = SimpleDirectoryReader(
     file_extractor = {'*.pdf': unstruct_loader}
 ).load_data()
 
+# For: https://github.com/run-llama/llama_index/issues/9111
+for document in documents:
+  document.embedding  = embeddings.embed_query(document.text)
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -100,7 +104,7 @@ from llama_index.callbacks import CallbackManager, LlamaDebugHandler
 from langchain.chat_models import ChatMLflowAIGateway
 
 # Using Databricks Model Serving
-browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
+browser_host = spark.conf.get("spark.databricks.workspaceUrl")
 db_host = f"https://{browser_host}"
 db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
