@@ -420,13 +420,16 @@ class LangchainQABot(mlflow.pyfunc.PythonModel):
 
 # **NOTE** This doesn't deploy properly as a model serving model yet
 # Due to some bug in the code
-db_token = '<redacted>'
+workspace_url = spark.conf.get("spark.databricks.workspaceUrl")
+
+# this will work for quick demo but create a proper token for use in prod
+db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 
 catalog = 'bootcamp_ml'
 schema = 'rag_chatbot'
 model_name = 'retrieval_chain'
 
-model = LangchainQABot('https://adb-984752964297111.11.azuredatabricks.net/', db_token, system_template, chroma_archive_folder)
+model = LangchainQABot(f'https://{workspace_url}/', db_token, system_template, chroma_archive_folder)
 
 user_input = "What is a tokenizer?"
 input_example = {"prompt": user_input}
@@ -440,7 +443,8 @@ with mlflow.start_run() as run:
   mlflow_result = mlflow.pyfunc.log_model(
       python_model = model,
       extra_pip_requirements = ['llama_index==0.8.54',
-                                'chromadb==0.4.17'],
+                                'chromadb==0.4.17',
+                                'protobuf==4.24.0'],
       artifacts = {
          'chroma_db': chroma_local_folder
       },
