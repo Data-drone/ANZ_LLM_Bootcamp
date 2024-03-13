@@ -13,7 +13,7 @@
 source_catalog = "bootcamp_ml"
 source_schema = "rag_chatbot"
 source_volume = "datasets"
-source_table = "demo_wiki"
+source_table = "arxiv_parse"
 vs_endpoint = "bootcamp_vs_endpoint"
 embedding_endpoint_name = "databricks-bge-large-en"
 
@@ -21,7 +21,7 @@ embedding_endpoint_name = "databricks-bge-large-en"
 
 # MAGIC %sql
 # MAGIC CREATE CATALOG IF NOT EXISTS bootcamp_ml;
-# MAGIC CREATE SCHEMA IF NOT EXISTS bootcamp_ml.rag_chatbot
+# MAGIC CREATE SCHEMA IF NOT EXISTS bootcamp_ml.rag_chatbot;
 # MAGIC CREATE VOLUME IF NOT EXISTS bootcamp_ml.rag_chatbot.datasets
 
 # COMMAND ----------
@@ -61,7 +61,7 @@ def chunk_pdf_from_dir(directory:str='./docs'):
 
     return document_chunks
 
-docs = chunk_pdf_from_dir(directory=volume_path)
+docs = chunk_pdf_from_dir(directory=f"/Volumes/{source_catalog}/{source_schema}/{source_volume}")
 
 # COMMAND ----------
 
@@ -142,13 +142,13 @@ index.describe()
 
 # COMMAND ----------
 
-# MAGIC
-# MAGIC ## Similarity search
+# MAGIC %md
+# MAGIC # Similarity search
 
 # COMMAND ----------
 
 results = index.similarity_search(
-  columns=["text"],
+  columns=["page_content"],
   # vs_index_fullname,
   query_text="Tell me about tuning LLMs",
   num_results=3
