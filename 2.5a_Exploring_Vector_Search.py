@@ -27,9 +27,9 @@ embedding_endpoint_name = "databricks-bge-large-en"
 # COMMAND ----------
 
 # We have loaded the chunks into a delta table
-source_table = spark.sql(f"select * from {source_catalog}.{source_schema}.{source_table}")
+raw_table = spark.sql(f"select * from {source_catalog}.{source_schema}.{source_table}")
 
-display(source_table)
+display(raw_table)
 
 # COMMAND ----------
 
