@@ -15,11 +15,6 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# DBTITLE 1,Setup
-# MAGIC %run ./utils
-
-# COMMAND ----------
-
 # We will use the Langchain wrapper though it is just a rest call
 from langchain_community.chat_models import ChatDatabricks
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -78,7 +73,6 @@ prompt = """
     Sentiment:
 """
 
-output = pipe([prompt], max_tokens=100)
 output = pipe([HumanMessage(content=prompt)], max_tokens=100)
 str_output = print(output.content)
 # COMMAND ----------
@@ -379,6 +373,7 @@ str_output = print(output.content)
 import mlflow
 import pandas as pd
 
+username = spark.sql("SELECT current_user()").first()['current_user()']
 mlflow_dir = f'/Users/{username}/mlflow_log_hf'
 mlflow.set_experiment(mlflow_dir)
 
@@ -386,9 +381,9 @@ mlflow.set_experiment(mlflow_dir)
 
 # DBTITLE 1,Evaluation Prompts
 common_test_prompts = [
-    "What is the capital of Korea?",
-    "Name the top 10 kpop groups in the world",
-    "Write me a infomercial script on why kimchi is good?",
+    "What is the Perth Australia famous for?",
+    "Name the top 10 burgers in Perth",
+    "Write me a infomercial script on why iron ore is good?",
     "What best way to make an omlet?",
     "What would you do if you had 1M dollars?"
 ]
@@ -403,8 +398,9 @@ testing_pandas_frame = pd.DataFrame(
 def eval_pipe(inputs):
     answers = []
     for index, row in inputs.iterrows():
-        result = pipe([row.item()])
-        answer = result['predictions'][0]['candidates'][0]['text']
+        # pipe([HumanMessage(content=prompt)], max_tokens=100)
+        result = pipe( [HumanMessage(content=row.item())], max_tokens=100)
+        answer = result.content
         answers.append(answer)
     
     return answers
@@ -422,7 +418,7 @@ with mlflow.start_run(run_name=model):
                           data=testing_pandas_frame, 
                           model_type='text')
     
-    
+
 model = 'databricks-llama-2-70b-chat'
 with mlflow.start_run(run_name=model):
     pipe = ChatDatabricks(
@@ -434,17 +430,3 @@ with mlflow.start_run(run_name=model):
     results = mlflow.evaluate(eval_pipe, 
                           data=testing_pandas_frame, 
                           model_type='text')
-
-
-model = 'databricks-mpt-30b-instruct'
-with mlflow.start_run(run_name='vicuna_13b'):
-    pipe = ChatDatabricks(
-            target_uri = 'databricks',
-            endpoint = model,
-            temperature = 0.1
-        )
-    results = mlflow.evaluate(eval_pipe, 
-                          data=testing_pandas_frame, 
-                          model_type='text')
-
-
