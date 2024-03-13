@@ -8,15 +8,10 @@
 # COMMAND ----------
 
 # DBTITLE 1,Library Setup
-# MAGIC #%pip install ctransformers==0.2.26
-# MAGIC %pip install mlflow==2.8.0 llama_index==0.8.54
+# MAGIC %pip install mlflow==2.11.1 llama_index==0.10.17 langchain==0.1.10
 # COMMAND ----------
 
 dbutils.library.restartPython()
-
-# COMMAND ----------
-
-run_mode = 'serving' # or gpu or cpu
 
 # COMMAND ----------
 
@@ -25,7 +20,15 @@ run_mode = 'serving' # or gpu or cpu
 
 # COMMAND ----------
 
-pipe = load_model(run_mode, dbfs_tmp_cache, 'zephyr_7b')
+# We will use the Langchain wrapper though it is just a rest call
+from langchain_community.chat_models import ChatDatabricks
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+pipe = ChatDatabricks(
+    target_uri = 'databricks',
+    endpoint = 'databricks-mixtral-8x7b-instruct',
+    temperature = 0.1
+)
 
 # COMMAND ----------
 
@@ -44,17 +47,13 @@ pipe = load_model(run_mode, dbfs_tmp_cache, 'zephyr_7b')
 # COMMAND ----------
 
 prompt = "The sky is"
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 prompt = "Knock Knock"
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 prompt = """
@@ -62,10 +61,8 @@ prompt = """
     Who's there?
     """
 
-output = pipe([prompt], max_tokens=250)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 # MAGIC %md
@@ -82,9 +79,8 @@ prompt = """
 """
 
 output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 # MAGIC %md
@@ -101,18 +97,8 @@ Text: I think the vacation is okay.
 Sentiment: [/INST]
 """
 
-zephyr_prompt = """<|system|>
-Classify the text into neutral, negative or positive.
-
-<|user|>
-Text: I think the vacation is okay.
-Sentiment: 
-<|assistant|> 
-"""
-
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -131,21 +117,8 @@ User Question: What is the interest rate in following paragraph?
 Answer: [/INST]
 """
 
-zephyr_prompt = """<|assistant|>
-Provide an answer to the question based on the following:
-
-The minutes from the Fed's June 13-14 meeting show that while almost all officials deemed it “appropriate or acceptable” to keep rates unchanged in a 5% to 5.25% target range, some would have supported a quarter-point increase instead.
-
-<|user|>
-User Question: What is the interest rate in following paragraph?
-Answer:
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 # MAGIC %md
@@ -169,25 +142,8 @@ Question:
 What account would you recommend a small business?[/INST]
 """
 
-zephyr_prompt = """<|system|>
-Be helpful and suggest a type of account for a customer.
-
-Here are some examples:
-A consumer wants a savings account
-A business wants a business account
-A tech unicorn deserves a special VC account
-
-Question:
-<|user|>
-What account would you recommend a small business?[/INST]
-
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 # COMMAND ----------
 
 prompt = """
@@ -204,24 +160,9 @@ Question:
 What account would you recommend a bob the builder?[/INST]
 """
 
-zephyr_prompt = """<|system|>
-Be helpful and suggest a type of account for a customer.
 
-Here are some examples:
-A consumer wants a savings account
-A business wants a business account
-A tech unicorn deserves a special VC account
-
-Question:
-<|user|>
-What account would you recommend a bob the builder?
-
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -257,30 +198,9 @@ Question:
 {user_question}[/INST]
 """
 
-zephyr_prompt = f"""
-<|system|>
-Provide helpful responses and guide the customers.     
 
-The follow example shows how to answer:
-Question:
-I went to the market and bought 10 apples. 
-I gave 2 apples to the neighbor and 2 to the repairman. 
-I then went and bought 5 more apples and ate 1. 
-
-Answer:
-The answer is 10
-
-Based on the above provide the answer to the following question.
-<|user|>
-{user_question}
-<|assistant|>
-"""
-
-
-output = pipe([prompt], max_tokens=100)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -309,9 +229,8 @@ Question:
 {user_question}[/INST]
 """
 
-output = pipe([prompt], max_tokens=250)
-str_output = string_printer(output, run_mode)
-print(str_output)
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -342,25 +261,8 @@ Question:
 {user_question}[/INST]
 """
 
-zephyr_prompt  = f"""
-<|system|>
-{system_prompt}
-    
-Here are some examples:
-A consumer wants a savings account
-A business wants a business account
-A tech unicorn deserves a special VC account
-
-<|user|>
-{user_question}
-
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=250)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -377,18 +279,8 @@ Question:
 {user_question}[/INST]
 """
 
-zehpyr_prompt = f"""<|system|>
-{system_prompt}
-
-<|user|>
-{user_question}
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=500)
-str_output = string_printer(output, run_mode)
-print(str_output)
-
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -445,17 +337,8 @@ Question:
 {user_question}[/INST]
 """
 
-zephyr_prompt = f"""<|system|>
-{system_prompt}
-
-<|user|>
-{user_question}
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=250)
-str_output = string_printer(output, run_mode)
-print(str_output)
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -473,22 +356,8 @@ Provide an answer to the following:
 {user_question}[/INST]
 """
 
-zephyr_prompt = f"""<|system|>{system_prompt}
-
-Based on the below context:
-
-LK-99 is a potential room-temperature superconductor with a gray‒black appearance.[2]: 8  It has a hexagonal structure slightly modified from lead‒apatite, by introducing small amounts of copper. A room-temperature superconductor is a material that is capable of exhibiting superconductivity at operating temperatures above 0 °C (273 K; 32 °F), that is, temperatures that can be reached and easily maintained in an everyday environment.
-
-Provide an answer to the following:
-<|user|>
-{user_question}
-
-<|assistant|>
-"""
-
-output = pipe([prompt], max_tokens=250)
-str_output = string_printer(output, run_mode)
-print(str_output)
+output = pipe([HumanMessage(content=prompt)], max_tokens=100)
+str_output = print(output.content)
 
 # COMMAND ----------
 
@@ -541,20 +410,39 @@ def eval_pipe(inputs):
     return answers
 # COMMAND ----------
 
-with mlflow.start_run(run_name='llama_2_7b'):
-    pipe = load_model(run_mode, dbfs_tmp_cache, 'llama_2_7b')
+model = 'databricks-mixtral-8x7b-instruct'
+with mlflow.start_run(run_name=model):
+    pipe = ChatDatabricks(
+            target_uri = 'databricks',
+            endpoint = model,
+            temperature = 0.1
+        )
+    
     results = mlflow.evaluate(eval_pipe, 
                           data=testing_pandas_frame, 
                           model_type='text')
     
-with mlflow.start_run(run_name='llama_2_13b'):
-    pipe = load_model(run_mode, dbfs_tmp_cache, 'llama_2_13b')
+    
+model = 'databricks-llama-2-70b-chat'
+with mlflow.start_run(run_name=model):
+    pipe = ChatDatabricks(
+            target_uri = 'databricks',
+            endpoint = model,
+            temperature = 0.1
+        )
+    
     results = mlflow.evaluate(eval_pipe, 
                           data=testing_pandas_frame, 
                           model_type='text')
 
+
+model = 'databricks-mpt-30b-instruct'
 with mlflow.start_run(run_name='vicuna_13b'):
-    pipe = load_model(run_mode, dbfs_tmp_cache, 'vicuna_13b')
+    pipe = ChatDatabricks(
+            target_uri = 'databricks',
+            endpoint = model,
+            temperature = 0.1
+        )
     results = mlflow.evaluate(eval_pipe, 
                           data=testing_pandas_frame, 
                           model_type='text')
