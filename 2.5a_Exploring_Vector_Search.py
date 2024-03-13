@@ -57,3 +57,12 @@ results = index.similarity_search(
   num_results = 3
   )
 
+# COMMAND ----------
+
+# Explore the results
+results
+
+# COMMAND ----------
+
+# pulling the top result
+print(results['result']['data_array'][0][0])
