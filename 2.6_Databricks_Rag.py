@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U langchain==0.1.10 sqlalchemy==2.0.27 pypdf==4.1.0 mlflow==2.11.0 databricks-vectorsearch 
+# MAGIC %pip install -U langchain==0.1.10 sqlalchemy==2.0.27 pypdf==4.1.0 mlflow==2.11.1 databricks-vectorsearch langchainhub==0.1.15
 
 # COMMAND ----------
 
@@ -35,6 +35,12 @@ from langchain_community.chat_models import ChatDatabricks
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_community.embeddings import DatabricksEmbeddings
 
+from langchain import hub
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
+
 pipe = ChatDatabricks(
     target_uri = 'databricks',
     endpoint = llm_model,
@@ -44,6 +50,25 @@ pipe = ChatDatabricks(
 # Construct and Test Embedding Model
 embeddings = DatabricksEmbeddings(endpoint=embedding_endpoint_name)
 
+rag_prompt = hub.pull("rlm/rag-prompt-mistral")
+
+rag_runnable = rag_prompt | pipe
+
+store = {}
+
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in store:
+        store[session_id] = ChatMessageHistory()
+    return store[session_id]
+
+
+rag_with_message_history = RunnableWithMessageHistory(
+    rag_runnable,
+    get_session_history,
+    input_messages_key="question",
+    history_messages_key="history",
+)
+
 # COMMAND ----------
 
 # Setup Retriever
@@ -51,7 +76,7 @@ from databricks.vector_search.client import VectorSearchClient
 from langchain_community.vectorstores import DatabricksVectorSearch
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.chains import create_history_aware_retriever
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 vsc = VectorSearchClient()
@@ -63,31 +88,15 @@ retriever = DatabricksVectorSearch(
     embedding=embeddings, columns=["source_doc"]
 ).as_retriever()
 
-retriever_prompt = ChatPromptTemplate.from_messages([
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("user", "{input}"),
-        ("user", "Given the above conversation, generate a response to answer this question")
-    ])
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
 
-retriever_chain = create_history_aware_retriever(pipe, retriever, retriever_prompt)
-
-# COMMAND ----------
-
-prompt_template = ChatPromptTemplate.from_messages([
-        ("system", """
-         You are a research assistance that helps to answer questions based on the below context
-
-         """),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("user", "{input}")
-    ])
-
-stuff_documents_chain = create_stuff_documents_chain(pipe, prompt_template)
-
-retrieval_chain = create_retrieval_chain(retriever_chain, stuff_documents_chain)
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | rag_with_message_history
+)
 
 # COMMAND ----------
 
-retrieval_chain.invoke({
-  "chat_history": [{"role": "user", "content": "I am interested in LLMs"}],
-  "input": "Tell me about how to tune them"})
+answer = rag_chain.invoke(input="test",
+                 config={"configurable": {"session_id": "abc123"}})
