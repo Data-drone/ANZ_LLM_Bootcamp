@@ -3,12 +3,23 @@
 # MAGIC # Prompting Basics
 # MAGIC
 # MAGIC Lets explore the basics of prompting\
-# MAGIC For more details see: https://www.promptingguide.ai/
+# MAGIC For more details see: https://www.promptingguide.ai/ \
+# MAGIC
+# MAGIC This notebook was last tested with:
+# MAGIC - MLR 14.3 LTS
+# MAGIC
+# MAGIC You will need access to databricks token based pricing models as well
+# MAGIC See: (AWS)[https://docs.databricks.com/en/machine-learning/model-serving/model-serving-limits.html#region-availability]
+# MAGIC See: (Azure)[https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/model-serving-limits#--region-availability]
+# MAGIC
+# MAGIC Note it is possible to explore prompting through the playground as well (subject to availability).
+# MAGIC See: (AWS)[https://docs.databricks.com/en/large-language-models/ai-playground.html]
+# MAGIC See: (Azure)[https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-playground]
 
 # COMMAND ----------
 
 # DBTITLE 1,Library Setup
-# MAGIC %pip install mlflow==2.11.1 llama_index==0.10.17 langchain==0.1.10
+# MAGIC %pip install mlflow==2.11.1 langchain==0.1.13
 # COMMAND ----------
 
 dbutils.library.restartPython()
@@ -406,6 +417,14 @@ def eval_pipe(inputs):
     return answers
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC *NOTE* ChatDatabricks is for use with "Chat" models only. \
+# MAGIC That is indicated but the word "Chat" appearing in it's description \
+# MAGIC MPT-7B and MPT-30B are "Completions" models which have a different format. \
+# MAGIC In Langchain you can use: ``https://api.python.langchain.com/en/stable/llms/langchain_community.llms.databricks.Databricks.html
+
+# COMMAND ----------
+
 model = 'databricks-mixtral-8x7b-instruct'
 with mlflow.start_run(run_name=model):
     pipe = ChatDatabricks(
@@ -420,6 +439,18 @@ with mlflow.start_run(run_name=model):
     
 
 model = 'databricks-llama-2-70b-chat'
+with mlflow.start_run(run_name=model):
+    pipe = ChatDatabricks(
+            target_uri = 'databricks',
+            endpoint = model,
+            temperature = 0.1
+        )
+    
+    results = mlflow.evaluate(eval_pipe, 
+                          data=testing_pandas_frame, 
+                          model_type='text')
+
+model = 'databricks-dbrx-instruct'
 with mlflow.start_run(run_name=model):
     pipe = ChatDatabricks(
             target_uri = 'databricks',

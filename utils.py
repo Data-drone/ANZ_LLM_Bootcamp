@@ -7,9 +7,9 @@
 # COMMAND ----------
 
 # setup env
-# TODO - adjust and use bootcamp ones later
 import os
 import requests
+from pathlib import Path
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
@@ -17,20 +17,22 @@ os.environ['USERNAME'] = username
 db_catalog = 'gen_ai_workshop'
 db_schema = 'datasets'
 db_volume = 'raw_data'
+raw_table = 'arxiv_data'
 hf_volume = 'hf_volume'
 
+#Internal dev
+#vector_search_endpoint = 'one-env-shared-endpoint-6' 
 vector_search_endpoint = 'gen_ai_workshop'
 
-# tmp_user_folder = f'/tmp/{username}'
-# dbutils.fs.mkdirs(tmp_user_folder)
-# dbfs_tmp_dir = f'/dbfs{tmp_user_folder}'
-# os.environ['PROJ_TMP_DIR'] = dbfs_tmp_dir
-
 # # setting up transformers cache
-# cache_dir = f'{tmp_user_folder}/.cache'
-# dbutils.fs.mkdirs(cache_dir)
-# dbfs_tmp_cache = f'/dbfs{cache_dir}'
-# os.environ['TRANSFORMERS_CACHE'] = dbfs_tmp_cache
+hf_volume_path = f'/Volumes/{db_catalog}/{db_schema}/{hf_volume}'
+
+transformers_cache = f'{hf_volume_path}/transformers'
+downloads_dir = f'{hf_volume_path}/downloads'
+tf_cache_path = Path(transformers_cache)
+dload_path = Path(downloads_dir)
+tf_cache_path.mkdir(parents=True, exist_ok=True)
+dload_path.mkdir(parents=True, exist_ok=True)
 
 # # setup source file_docs
 # source_doc_folder = f'/home/{username}/pdf_data'

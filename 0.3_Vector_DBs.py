@@ -8,8 +8,8 @@
 
 # COMMAND ----------
 
-%pip install faiss-cpu wikipedia
-dbutils.library.restartPython()
+# MAGIC %pip install faiss-cpu wikipedia
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -56,10 +56,9 @@ len(page.content.split())
 # COMMAND ----------
 from transformers import AutoTokenizer
 
-# TODO - Replace Volumes folder
-model_id = 'mistralai/Mistral-7B-v0.1'
-model_revision = ''
-tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
+# We will use the tokenizer from 'mistralai/Mistral-7B-v0.1'
+tokenizer = AutoTokenizer.from_pretrained(f'{downloads_dir}/mistral_7b_instruct', 
+                                          local_files_only=True)
 
 
 # COMMAND ----------

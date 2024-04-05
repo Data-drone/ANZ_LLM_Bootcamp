@@ -24,7 +24,7 @@ import requests
 spark.sql(f"CREATE CATALOG IF NOT EXISTS {db_catalog}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {db_catalog}.{db_schema}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{db_volume}")
-volume_folder = f"/Volumes/{db_catalog}/{db_schema}/{volume_name}/"
+volume_folder = f"/Volumes/{db_catalog}/{db_schema}/{db_volume}/"
 
 # COMMAND ----------
 
@@ -71,12 +71,17 @@ for pdf in pdfs.keys():
 # COMMAND ----------
 
 # DBTITLE 1,To Examine Embeddings we need to download from huggingface
+from pathlib import Path
+
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{hf_volume}")
 hf_volume_path = f'/Volumes/{db_catalog}/{db_schema}/{hf_volume}'
 
 transformers_cache = f'{hf_volume_path}/transformers'
 downloads_dir = f'{hf_volume_path}/downloads'
-os.mkdirs[transformers_cache]
+tf_cache_path = Path(transformers_cache)
+dload_path = Path(downloads_dir)
+tf_cache_path.mkdir(parents=True, exist_ok=True)
+dload_path.mkdir(parents=True, exist_ok=True)
 
 os.environ['HF_HOME'] = hf_volume_path
 os.environ['TRANSFORMERS_CACHE'] = transformers_cache
@@ -103,7 +108,14 @@ from databricks.vector_search.client import VectorSearchClient
 
 vsc = VectorSearchClient()
 
-vsc.create_endpoint(
-    name = vector_search_endpoint,
-    endpoint_type="STANDARD"
-)
+# check existing endpoints
+active_endpoints = vsc.list_endpoints()
+act_ept_list = [x['name'] for x in active_endpoints['endpoints']]
+
+if vector_search_endpoint in act_ept_list:
+    pass
+else:
+    vsc.create_endpoint(
+        name = vector_search_endpoint,
+        endpoint_type="STANDARD"
+    )
