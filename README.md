@@ -16,7 +16,7 @@ See: [Creating Model Endpoints](https://docs.databricks.com/en/machine-learning/
 
 `0.1_lab_setup(instructor_only)` Notebook is to be run by instructor. This downloads HuggingFace models and some sample documents for us to work with. The workspace will need to have access to `*.huggingface.co` for the models and wikipedia and some other websites for pdf data.
 
-`0.x_` series notebooks go through LLM basics and setup a basic RAG app powered by HuggingFace open source models. 
+`0.x_` series notebooks go through LLM basics and setup a basic RAG app powered by HuggingFace open source models. \
 `1.x_` series notebooks cover go into more detail about constructing and tuning RAG Architectures.
 
 ## Extras
