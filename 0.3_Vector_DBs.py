@@ -8,11 +8,8 @@
 
 # COMMAND ----------
 
-%pip install faiss-cpu wikipedia llama_index==0.8.54
-
-# COMMAND ----------
-
-dbutils.library.restartPython()
+# MAGIC %pip install faiss-cpu wikipedia
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -59,9 +56,9 @@ len(page.content.split())
 # COMMAND ----------
 from transformers import AutoTokenizer
 
-model_id = 'HuggingFaceH4/zephyr-7b-beta'
-model_revision = '3bac358730f8806e5c3dc7c7e19eb36e045bf720'
-tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=dbfs_tmp_cache)
+# We will use the tokenizer from 'mistralai/Mistral-7B-v0.1'
+tokenizer = AutoTokenizer.from_pretrained(f'{downloads_dir}/mistral_7b_instruct', 
+                                          local_files_only=True)
 
 
 # COMMAND ----------

@@ -7,15 +7,15 @@
 
 # COMMAND ----------
 
-%pip install llama_index==0.8.54 spacy ragas==0.0.18
+# MAGIC %pip install llama_index==0.10.25 langchain==0.1.13 llama-index-llms-langchain llama-index-embeddings-langchain
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
+import os
+import pandas as pd
 import nest_asyncio
+
 # Needed for the async calls to work
 nest_asyncio.apply()
 
@@ -37,80 +37,55 @@ nest_asyncio.apply()
 
 # COMMAND ----------
 
-import os
-
-# COMMAND ----------
-
-# DBTITLE 1,Configurations
-test_pdf = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
-#test_pdf = f'{dbfs_source_docs}/2302.09419.pdf'
-test_pdf
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ## Setup Service Context
-# MAGIC The service context sets up the LLM and embedding model that we will use for our exercises
-# MAGIC In this case, the Embedding Model and the LLM are both setup onto Databricks serving
+# MAGIC ## Setting up Llama Index default models
+# MAGIC If we don't setup new defaults, Llama_index will go to OpenAI by default
 
 # COMMAND ----------
 
-from llama_index import (
-  ServiceContext,
-  set_global_service_context,
-  LLMPredictor
+from langchain_community.chat_models import ChatDatabricks
+from langchain_community.embeddings import DatabricksEmbeddings
+from llama_index.core import Settings
+from llama_index.llms.langchain import LangChainLLM
+from llama_index.embeddings.langchain import LangchainEmbedding
+
+embedding_model = 'databricks-bge-large-en'
+model_name = 'databricks-dbrx-instruct'
+
+llm_model = model = ChatDatabricks(
+  target_uri='databricks',
+  endpoint = model_name,
+  temperature = 0.1
 )
-from llama_index.callbacks import CallbackManager, LlamaDebugHandler, CBEventType
 
-# Using Databricks Model Serving
-browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
-db_host = f"https://{browser_host}"
-db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+embeddings = DatabricksEmbeddings(endpoint=embedding_model)
 
-serving_uri = 'zephyr_7b'
-serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
-
-embedding_uri = 'brian_embedding_endpoint'
-embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
-
-llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
-
-llm_predictor = LLMPredictor(llm=llm_model)
-
-### define embedding model setup
-from langchain.embeddings import MosaicMLInstructorEmbeddings
-embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
-
-llama_debug = LlamaDebugHandler(print_trace_on_end=True)
-callback_manager = CallbackManager([llama_debug])
-
-service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=embeddings,
-                                               callback_manager = callback_manager 
-                                               )
-
-# we can now set this context to be a global default
-set_global_service_context(service_context)
+llama_index_chain = LangChainLLM(llm=llm_model)
+llama_index_embeddings = LangchainEmbedding(langchain_embeddings=embeddings)
+Settings.llm = llama_index_chain 
+Settings.embed_model = llama_index_embeddings 
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Load and Chunk Document
+# MAGIC # Load and Chunk Documents
 # MAGIC We will load a sample doc to test on, firstly with a naive default chunking strategy
 # MAGIC
 # COMMAND ----------
 
-# chunk the output
-from llama_index import (
-    download_loader, VectorStoreIndex
+vol_path = f'/Volumes/{db_catalog}/{db_schema}/{db_volume}/'
+
+# validate we have files
+os.listdir(vol_path)
+
+# COMMAND ----------
+
+from llama_index.core import (
+  SimpleDirectoryReader, VectorStoreIndex, Response   
 )
-from pathlib import Path
 
-PDFReader = download_loader('PDFReader')
-loader = PDFReader()
-
-# This produces a list of llama_index document objects
-documents = loader.load_data(file=Path(test_pdf))
+reader = SimpleDirectoryReader(vol_path)
+documents = reader.load_data()
 
 # COMMAND ----------
 
@@ -134,18 +109,28 @@ print(reply.response)
 # MAGIC Note that this will have limitations, namely in the types of questions it will generate
 # COMMAND ----------
 
-from llama_index.evaluation import DatasetGenerator, RelevancyEvaluator
+from llama_index.core.evaluation import DatasetGenerator
 
-# this is the question generator. Note that it has additional settings to customise prompt etc
-data_generator = DatasetGenerator.from_documents(documents=documents, service_context=service_context)
+data_generator = DatasetGenerator.from_documents(documents)
+
 
 # this is the call to generate the questions
-eval_questions = data_generator.generate_questions_from_nodes()
+# if you set the number it will run multithreaded and be gaster
+eval_questions = data_generator.generate_questions_from_nodes(num=64)
 eval_questions
 
 # Some of these questions might not be too useful. It could be because of the model we are using for generation
 # It could also be that the chunk is particularly bad
 
+# COMMAND ----------
+
+# When running in lab env we may pregenerate ahead of the class and store it for reloading
+#question_frame = spark.sql(f"SELECT * FROM {db_catalog}.{db_schema}.evaluation_questions").toPandas()
+question_frame = pd.DataFrame(eval_questions, columns=["eval_questions"])
+dataframe = spark.createDataFrame(question_frame)
+
+dataframe.write.mode("overwrite").saveAsTable(f"{db_catalog}.{db_schema}.evaluation_questions")
+display(dataframe)
 # COMMAND ----------
 
 # MAGIC %md
@@ -158,35 +143,49 @@ eval_questions
 # COMMAND ----------
 
 import pandas as pd
+from llama_index.core.evaluation import RelevancyEvaluator
+from llama_index.core.evaluation import EvaluationResult
 
 eval_questions = eval_questions[0:20]
 
 # Yes we are using a LLM to evaluate a LLM
 ## When doing this normally you might use a more powerful but more expensive evaluator
 ## to assess the quality of your input
-evaluator = RelevancyEvaluator(service_context=service_context)
+evaluator = RelevancyEvaluator(llm=llama_index_chain)
 
-# lets create and log the data properly
-results = []
-
-for question in eval_questions:
-    
-    engine_response = query_engine.query(question)
-    evaluation = evaluator.evaluate_response(question, engine_response)
-    results.append(
-      {
-        "query": question,
-        "response": str(engine_response.response),
-        "source": engine_response.source_nodes[0].node.text,
-        "evaluation": evaluation
-      }   
+# define jupyter display function
+def display_eval_df(
+    query: str, response: Response, eval_result: EvaluationResult
+) -> None:
+    eval_df = pd.DataFrame(
+        {
+            "Query": query,
+            "Response": str(response),
+            "Source": response.source_nodes[0].node.text[:1000] + "...",
+            "Evaluation Result": "Pass" if eval_result.passing else "Fail",
+            "Reasoning": eval_result.feedback,
+        },
+        index=[0],
     )
-
-# we will load it into a pandas frame: 
-response_df = pd.DataFrame(results)
+    eval_df = eval_df.style.set_properties(
+        **{
+            "inline-size": "600px",
+            "overflow-wrap": "break-word",
+        },
+        subset=["Response", "Source"]
+    )
+    display(eval_df)
 # COMMAND ----------
 
-# Let see what is in the frame
-response_df
+query_str = (
+    "What is the best approach to finetuning llms?"
+)
+query_engine = index.as_query_engine()
+response_vector = query_engine.query(query_str)
+eval_result = evaluator.evaluate_response(
+    query=query_str, response=response_vector
+)
 
 # COMMAND ----------
+
+display_eval_df(query_str, response_vector, eval_result)

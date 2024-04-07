@@ -1,77 +1,70 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Understanding Embeddings
-# MAGIC Embeddings are just vectors and we can visualise and analyse them as such \
-# MAGIC A common way to look at and explore embeddings is to use TSNE visualisations. \
-# MAGIC This can be applied to our VectorDB Data too.
+# MAGIC # Understanding Embeddings & Retrieval
+# MAGIC Enhancing our parsing and chunking algorithms can help to make sure that we collect just the full text \
+# MAGIC in our doucments. How we embed them can also have an effect.
 # MAGIC
-# MAGIC See: https://www.kaggle.com/code/colinmorris/visualizing-embeddings-with-t-sne
-# MAGIC
-# MAGIC An open source tool that you might want to investigate for this as well is Arize Phoenix \
-# MAGIC See: https://docs.arize.com/phoenix/
-
-# COMMAND ----------
-# MAGIC # "arize-phoenix[experimental]"  pandas==1.5.3
-# MAGIC %pip install -U llama_index==0.8.54 faiss-cpu datashader bokeh holoviews scikit-image colorcet "arize-phoenix[experimental]"
+# MAGIC Embedding Models like LLMs have to be trained against s set of documents. \
+# MAGIC Words that aren't in the training corpus will likely get tokenised letter by letter \
+# MAGIC Foreign languages that aren't part of the training will also suffer in quality.
 
 # COMMAND ----------
 
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Setup configs
-
+# MAGIC %pip install pymupdf faiss-cpu datashader bokeh holoviews scikit-image colorcet llama_index==0.10.25 langchain==0.1.13 llama-index-llms-langchain poppler-utils unstructured[pdf,txt]==0.13.0 databricks-vectorsearch==0.23 llama-index-embeddings-langchain
+# MAGIC dbutils.library.restartPython()
 # COMMAND ----------
 
 # MAGIC %run ./utils
 
 # COMMAND ----------
 
+# DBTITLE 1,Setup Configurations
 import os
 import numpy as np
 
-# COMMAND ----------
+# Setup Models & Embeddings
+from langchain_community.chat_models import ChatDatabricks
+from langchain_community.embeddings import DatabricksEmbeddings
+from llama_index.core import Settings
+from llama_index.llms.langchain import LangChainLLM
+from llama_index.embeddings.langchain import LangchainEmbedding
+import nltk
 
-# DBTITLE 1,Configurations
-# test_pdf = f'{dbfs_source_docs}/2010.11934.pdf'
-test_pdf = '/dbfs/bootcamp_data/pdf_data/2302.09419.pdf'
-test_pdf
+nltk.download('averaged_perceptron_tagger')
+model_name = 'databricks-dbrx-instruct'
+embedding_model = 'databricks-bge-large-en'
+
+llm_model = ChatDatabricks(
+  target_uri='databricks',
+  endpoint = model_name,
+  temperature = 0.1
+)
+embeddings = DatabricksEmbeddings(endpoint=embedding_model)
+
+llama_index_chain = LangChainLLM(llm=llm_model)
+llama_index_embeddings = LangchainEmbedding(embeddings)
+Settings.llm = llama_index_chain
+Settings.embed_model = llama_index_embeddings
+
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC
-# MAGIC # Understanding Embeddings
+# MAGIC ## Exploring Embeddings with ReRank
 # MAGIC
 # MAGIC Lets explore how data embeds a bit more in order to see how we can improve retrieval \
-# MAGIC We will use a model deployed on Databricks Model Serving
-# COMMAND ----------
-
-# DBTITLE 1,Setup some embedding algorithms
-browser_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().browserHostName().get()
-db_host = f"https://{browser_host}"
-db_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-
-serving_uri = 'vicuna_13b'
-serving_model_uri = f"{db_host}/serving-endpoints/{serving_uri}/invocations"
-
-embedding_uri = 'brian_embedding_endpoint'
-embedding_model_uri = f"{db_host}/serving-endpoints/{embedding_uri}/invocations"
-
-llm_model = ServingEndpointLLM(endpoint_url=serving_model_uri, token=db_token)
-
-embeddings = ModelServingEndpointEmbeddings(db_api_token=db_token)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Simple Exploration w ReRank
+# MAGIC At it's heart, embeddings just look at the occurences of words, not semantic meaning.
+# MAGIC
+# MAGIC
+# MAGIC The easiest way to understand this is to look at ReRank \
+# MAGIC Here we ask an LLM to look at our retrievals then choose which ones are actually relevant to our question \
+# MAGIC (I would always recommend including Rerank as a part of your final Orchestrator Logic)
 
 # COMMAND ----------
 
 # most vector stores use cosine_similarity
+# We use faiss for ease of use here.
 import faiss
 
 example_sentences = ["The kangaroo population in Australia is declining due to habitat loss and hunting.",
@@ -112,6 +105,10 @@ for score, sentence in human_readable_result:
 
 # COMMAND ----------
 
+# MAGIC %md We can see that we are picking up things that just talk about Kangaroos with no relation to the question
+
+# COMMAND ----------
+
 # we can use a rerank to try to improve the result
 format_top = []
 for i in range(len(top_sentences)):
@@ -145,133 +142,66 @@ rerank_prompt = ("A list of documents is shown below. Each document has a number
     f"Question: {test_question}\n"
     "Answer:\n")
 
-reranked_result = llm_model(rerank_prompt)
+reranked_result = llm_model.invoke(rerank_prompt)
 
-print(reranked_result)
+print(reranked_result.content)
+
+# COMMAND ----------
+
+# MAGIC %md With rerank, we are finally getting the key chunks that matter.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Visualising Embeddings
+# MAGIC # Visualising Embeddings
+# MAGIC
+# MAGIC Whilst rerank can help us to get the right chunks, we still need to hope that we are able to retrieve the correct chunks as part of our search first. \
+# MAGIC We can assess the quality of our chunks and embeddings by visualising them first.
+# MAGIC
+# MAGIC For this, we will use umap.
 
 # COMMAND ----------
 
-# So we can use reranking in order to better craft our results.
-# Can we also look at our embeddings to understand the content?
-# We will use umap and bokeh for this
+# DBTITLE 1,Setup Vector Index
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from pathlib import Path
+from llama_index.readers.file.unstructured import UnstructuredReader
+
+index_persist_dir = f'/Volumes/{db_catalog}/{db_schema}/{db_volume}/folder_index'
+Path(index_persist_dir).mkdir(exist_ok=True, parents=True)
+
+# This can take up to 18 mins on 8 core node - suggest running before class
+# documents = SimpleDirectoryReader(
+#    input_dir=f"/Volumes/{db_catalog}/{db_schema}/{db_volume}",
+#    file_extractor={
+#       ".pdf": UnstructuredReader()
+#    }
+# ).load_data(num_workers=20)
+
+# folder_index = VectorStoreIndex.from_documents(documents)
+# folder_index.storage_context.persist(persist_dir=index_persist_dir)
+
+# If index has been created can reload
+from llama_index.core import StorageContext, load_index_from_storage
+
+# rebuild storage context
+storage_context = StorageContext.from_defaults(persist_dir=index_persist_dir)
+
+# load index
+folder_index = load_index_from_storage(storage_context)
+
+# COMMAND ----------
 
 import pandas as pd
-
 import umap
-from umap import plot
-
 import plotly.express as px
-
 from bokeh.resources import CDN
 from bokeh.embed import file_html
 
-umap_2d = umap.UMAP(n_components=2, init='random', random_state=0)
-#umap_3d = umap.UMAP(n_components=3, init='random', random_state=0)
-
-proj_2d = umap_2d.fit(vector_format_encode)
-
-hover_data =  pd.DataFrame({'index': np.arange(len(example_sentences)) ,
-                          'text': example_sentences})
-
-# COMMAND ----------
-
-plot.output_notebook()
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC We can now visualise the data, note that we don't have a lot of datapoints \
-# MAGIC so there aren't any obvious patterns in these but as you add more points patterns should appear
-# COMMAND ----------
-
-# hover_data=hover_data,
-p = plot.interactive(proj_2d,  point_size=10)
-html = file_html(p, CDN, "Sample Sentences")
-displayHTML(html)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Embeddings with Whole Document
-# MAGIC
-
-# COMMAND ----------
-
-# MAGIC %md ## Setup Service Context
-# MAGIC By default, llama_index assumes that OpenAI is the service context \
-# MAGIC We are using AzureOpen AI so the setup is a little different. \
-# MAGIC Azure OpenAI notably requires two deployments, an embedder and the model \
-# MAGIC We will demonstrate a hybrid setup here where we use a huggingface sentence transformer \
-# MAGIC that will do the embeddings for our vector store \
-# MAGIC Whilst AzureOpenAI (gpt-3.5-turbo) provides the brains
-
-# COMMAND ----------
-
-
-from llama_index import (
-  ServiceContext,
-  set_global_service_context,
-  LLMPredictor
-)
-from llama_index.embeddings import LangchainEmbedding
-from llama_index.callbacks import CallbackManager, OpenInferenceCallbackHandler, LlamaDebugHandler
-
-callback_handler = OpenInferenceCallbackHandler()
-callback_manager = CallbackManager([callback_handler])
-
-llm_predictor = LLMPredictor(llm=llm_model)
-service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, 
-                                               embed_model=embeddings,
-                                               callback_manager = callback_manager 
-                                               )
-
-# we can now set this context to be a global default
-set_global_service_context(service_context)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Load and Chunk Document
-# MAGIC We will load a sample doc to test on, firstly with a naive default chunking strategy
-# MAGIC
-# COMMAND ----------
-
-# DBTITLE 1,Create Index
-
-# chunk the output
-from llama_index import (
-    download_loader, VectorStoreIndex
-)
-from llama_index.evaluation import DatasetGenerator
-from pathlib import Path
-
-PDFReader = download_loader('PDFReader')
-loader = PDFReader()
-
-# This produces a list of llama_index document objects
-documents = loader.load_data(file=Path(test_pdf))
-
-# we are just setting up a simple in memory Vectorstore here
-index = VectorStoreIndex.from_documents(documents)
-
-# COMMAND ----------
-
-# Lets have a quick look at the embeddings
-
-text_obj = [document.text for document in documents]
-encoded_chunks = [embeddings.embed_query(document_text) for document_text in text_obj]
+text_obj = [document.text for document in list(folder_index.docstore.docs.values())]
+encoded_chunks = [embeddings.embed_query(text_chk) for text_chk in text_obj]
 vector_chunks = np.array(encoded_chunks, dtype=np.float32)
 vector_chunks /= np.linalg.norm(vector_chunks, axis=1)[:, np.newaxis]
-
-# COMMAND ----------
-
-# DBTITLE 1,Examine Chunk text
-pd.set_option('display.max_colwidth', 1000)
-hover_data
 
 # COMMAND ----------
 
@@ -284,98 +214,17 @@ proj_2d = umap_2d.fit(vector_chunks)
 hover_data =  pd.DataFrame({'index': np.arange(len(text_obj)) ,
                           'text': text_obj})
 
-# hover_data=hover_data,
+# COMMAND ----------
+
+# Seems this requires GPU?
+from umap import plot
+
 p = plot.interactive(proj_2d,  point_size=10)
 html = file_html(p, CDN, "Research Doc")
 displayHTML(html)
 
-
 # COMMAND ----------
 
-# MAGIC %md TODO BIER comparison of embedding algorithms
-
-# COMMAND ----------
-
-# DBTITLE 1,Create Sample Questions
-import nest_asyncio
-nest_asyncio.apply()
-
-# and turning it into a query engine
-query_engine = index.as_query_engine()
-
-# this is the question generator. Note that it has additional settings to customise prompt etc
-data_generator = DatasetGenerator.from_documents(documents=documents,
-                                                 service_context=service_context)
-
-# this is the call to generate the questions
-eval_questions = data_generator.generate_questions_from_nodes()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # (WIP) Create Phoenix Visualisations
-# MAGIC TODO We are working with the Arize team to make Phoenix work \
-# MAGIC till that happens this code will not be of use for now
-
-# COMMAND ----------
-
-# Extract out nodes
-# test parse index data
-document_ids = []
-document_texts = []
-document_embeddings = []
-
-docstore = index.storage_context.docstore
-for node_id, node in docstore.docs.items():
-  document_ids.append(node.hash)  # use node hash as the document ID
-  document_texts.append(node.text)
-  document_embeddings.append(np.array(index.storage_context.vector_store.get(node_id)))
-
-dataset_df = pd.DataFrame(
-        {
-            "document_id": document_ids,
-            "text": document_texts,
-            "text_vector": document_embeddings,
-        }
-    )
-# COMMAND ----------
-
-# create the query frame
-
-from llama_index.callbacks.open_inference_callback import as_dataframe
-
-callback_handler = OpenInferenceCallbackHandler()
-query_data_buffer = callback_handler.flush_query_data_buffer()
-sample_query_df = as_dataframe(query_data_buffer)
-sample_query_df
-
-# COMMAND ----------
-
-import phoenix as px
-
-### Create the schema for the documents
-database_schema = px.Schema(
-    prediction_id_column_name="document_id",
-    prompt_column_names=px.EmbeddingColumnNames(
-        vector_column_name="text_vector",
-        raw_data_column_name="text",
-    ),
-)
-database_ds = px.Dataset(
-    dataframe=dataset_df,
-    schema=database_schema,
-    name="database",
-)
-
-query_ds = px.Dataset.from_open_inference(sample_query_df)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Start Visualisation App
-
-# COMMAND ----------
-
-session = px.launch_app(primary=query_ds, corpus=database_ds, host='0.0.0.0', port='10101')
-
-# COMMAND ----------
+# MAGIC %md A further extension to tune your embeddings is to explore finetuning them. \
+# MAGIC You would need to then host and deploy the model though
+# MAGIC See: [Finetuning Embeddings](https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding/)

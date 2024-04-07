@@ -6,11 +6,8 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install llama_index==0.8.54
-
-# COMMAND ----------
-
-dbutils.library.restartPython()
+# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch huggingface_hub
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -18,30 +15,21 @@ import os
 import requests
 
 # COMMAND ----------
-# DBTITLE 1,Setup dbfs folder paths
+# DBTITLE 1,Setup utils to ensure consistency
 # MAGIC %run ./utils
 
 # COMMAND ----------
 
-# DBTITLE 1,Config Params
-# We will setup a folder to store the files
-user_agent = "me-me-me"
-
-reset_home = False 
-
-# If running this on your own in multiuser environment then use this
-library_folder = dbfs_source_docs
-
-# When teaching a class
-class_lib = '/bootcamp_data/pdf_data'
-
-if reset_home == True:
-    dbutils.fs.rm(class_lib, True)
-dbutils.fs.mkdirs(class_lib)
-library_folder = f'/dbfs{class_lib}'
+# Setup Catalogs and directories
+spark.sql(f"CREATE CATALOG IF NOT EXISTS {db_catalog}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {db_catalog}.{db_schema}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{db_volume}")
+volume_folder = f"/Volumes/{db_catalog}/{db_schema}/{db_volume}/"
 
 # COMMAND ----------
 
+# DBTITLE 1,Download Files
+# We will setup a folder to store the files
 def load_file(file_uri, file_name, library_folder):
     
     # Create the local file path for saving the PDF
@@ -50,7 +38,7 @@ def load_file(file_uri, file_name, library_folder):
     # Download the PDF using requests
     try:
         # Set the custom User-Agent header
-        headers = {"User-Agent": user_agent}
+        headers = {"User-Agent": "me-me-me"}
 
         response = requests.get(file_uri, headers=headers)
 
@@ -65,9 +53,6 @@ def load_file(file_uri, file_name, library_folder):
     except requests.RequestException as e:
         print("Error occurred during the request:", e)
 
-
-# COMMAND ----------
-
 pdfs = {'2203.02155.pdf':'https://arxiv.org/pdf/2203.02155.pdf',
         '2302.09419.pdf': 'https://arxiv.org/pdf/2302.09419.pdf',
         'Brooks_InstructPix2Pix_Learning_To_Follow_Image_Editing_Instructions_CVPR_2023_paper.pdf': 'https://openaccess.thecvf.com/content/CVPR2023/papers/Brooks_InstructPix2Pix_Learning_To_Follow_Image_Editing_Instructions_CVPR_2023_paper.pdf',
@@ -81,93 +66,56 @@ pdfs = {'2203.02155.pdf':'https://arxiv.org/pdf/2203.02155.pdf',
         '2204.01691.pdf':'https://arxiv.org/pdf/2204.01691.pdf'}
 
 for pdf in pdfs.keys():
-    load_file(pdfs[pdf], pdf, library_folder)
+    load_file(pdfs[pdf], pdf, volume_folder)
 
 # COMMAND ----------
 
-dbutils.fs.ls(class_lib)
+# DBTITLE 1,To Examine Embeddings we need to download from huggingface
+from pathlib import Path
 
-# COMMAND ----------
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{hf_volume}")
+hf_volume_path = f'/Volumes/{db_catalog}/{db_schema}/{hf_volume}'
 
-# MAGIC %md
-# MAGIC Setting up huggingface \
-# MAGIC Lets load the models that we need \
-# MAGIC Then we can save students having to wait for downloads or worry about tokens for HF
+transformers_cache = f'{hf_volume_path}/transformers'
+downloads_dir = f'{hf_volume_path}/downloads'
+tf_cache_path = Path(transformers_cache)
+dload_path = Path(downloads_dir)
+tf_cache_path.mkdir(parents=True, exist_ok=True)
+dload_path.mkdir(parents=True, exist_ok=True)
 
-# COMMAND ----------
+os.environ['HF_HOME'] = hf_volume_path
+os.environ['TRANSFORMERS_CACHE'] = transformers_cache
 
-import os
-hf_home = '/bootcamp_data/hf_cache'
-transformers_cache = f'{hf_home}/transformers'
-download_dir = f'{hf_home}/downloads'
-
-if reset_home == True:
-    dbutils.fs.rm(hf_home, True)
-
-dbutils.fs.mkdirs(hf_home)
-dbutils.fs.mkdirs(transformers_cache)
-dbutils.fs.mkdirs(download_dir)
-
-dbfs_hf_home = f'/dbfs{hf_home}'
-dbfs_transformers_home = f'/dbfs{transformers_cache}'
-dbfs_downloads_home = f'/dbfs{download_dir}'
-
-os.environ['TRANSFORMERS_CACHE'] = dbfs_transformers_home
-os.environ['HF_HOME'] = dbfs_hf_home
-
-# COMMAND ----------
-
-%sh export TRANSFORMERS_CACHE=$dbfs_transformers_home
-
-# COMMAND ----------
-# this is needed for llama 2 downloading
-# You need to create a huggingface account
-# The follow the instructions here: https://huggingface.co/docs/hub/security-tokens#:~:text=To%20create%20an%20access%20token,you're%20ready%20to%20go!
-# we could also use notebook login
-
-# we can use a secret to setup the huggingface connection
-
-import huggingface_hub
-
-# use this if you are logging in when doing lab setup
-# huggingface_hub.notebook_login()
-
-# use this if you have a hf key saved in secrets
-huggingface_key = dbutils.secrets.get(scope='bootcamp_training', key='hf-key')
-huggingface_hub.login(token=huggingface_key)
-
-# COMMAND ----------
-
-# Lets use snapshot downloads
 from huggingface_hub import hf_hub_download, list_repo_files
 
-repo_list = {'llama_2_gpu': 'meta-llama/Llama-2-7b-chat-hf',
-             'llama_2_cpu': 'TheBloke/Llama-2-7B-chat-GGUF',
-             'llama_2_awq': 'TheBloke/Llama-2-7B-AWQ',
-             'llama_2_13b': 'meta-llama/Llama-2-13b-chat-hf',
-             'llama_2_13b_awq': 'TheBloke/Llama-2-13B-chat-AWQ',
-             'vicuna_1.5_13b': 'lmsys/vicuna-13b-v1.5',
-             'vicuna_1.5_13b_awq': 'TheBloke/vicuna-13B-v1.5-16K-AWQ',
-             'mistral_7b_instruct': 'mistralai/Mistral-7B-Instruct-v0.1',
-             'mistral_7b': 'mistralai/Mistral-7B-v0.1',
-             'zephyr_7b': 'HuggingFaceH4/zephyr-7b-beta'} #,
-             #'llama_2_70b': 'meta-llama/Llama-2-70b-chat-hf'}
+repo_list = {'mistral_7b_instruct': 'mistralai/Mistral-7B-v0.1'}
 
 for lib_name in repo_list.keys():
     for name in list_repo_files(repo_list[lib_name]):
-        # skip all the safetensors data as we aren't using it and it's time consuming to download
-        if "safetensors" in name:
-            if lib_name in ['llama_2_awq', 'llama_2_13b_awq', 'vicuna_1.5_13b_awq', 
-                            'mistral_7b_instruct', 'mistral_7b', 'zephyr_7b']:
-                pass
-            else:
-                continue
-        target_path = os.path.join(dbfs_downloads_home, lib_name, name)
+        target_path = os.path.join(downloads_dir, lib_name, name)
         if not os.path.exists(target_path):
-            print(f"Downloading {name}")
             hf_hub_download(
                 repo_list[lib_name],
                 filename=name,
-                local_dir=os.path.join(dbfs_downloads_home, lib_name),
-                local_dir_use_symlinks=False,
+                local_dir=os.path.join(downloads_dir, lib_name),
+                local_dir_use_symlinks=False
             )
+
+# COMMAND ----------
+            
+# Setup Vector Search Endpoint
+from databricks.vector_search.client import VectorSearchClient
+
+vsc = VectorSearchClient()
+
+# check existing endpoints
+active_endpoints = vsc.list_endpoints()
+act_ept_list = [x['name'] for x in active_endpoints['endpoints']]
+
+if vector_search_endpoint in act_ept_list:
+    pass
+else:
+    vsc.create_endpoint(
+        name = vector_search_endpoint,
+        endpoint_type="STANDARD"
+    )
