@@ -8,21 +8,18 @@
 # MAGIC This notebook was last tested with:
 # MAGIC - MLR 14.3 LTS
 # MAGIC
-# MAGIC You will need access to databricks token based pricing models as well
-# MAGIC See: (AWS)[https://docs.databricks.com/en/machine-learning/model-serving/model-serving-limits.html#region-availability]
-# MAGIC See: (Azure)[https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/model-serving-limits#--region-availability]
+# MAGIC You will need access to databricks token based pricing models as well \
+# MAGIC See: [AWS](https://docs.databricks.com/en/machine-learning/model-serving/model-serving-limits.html#region-availability) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/model-serving-limits#--region-availability)
 # MAGIC
 # MAGIC Note it is possible to explore prompting through the playground as well (subject to availability).
-# MAGIC See: (AWS)[https://docs.databricks.com/en/large-language-models/ai-playground.html]
-# MAGIC See: (Azure)[https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-playground]
+# MAGIC See: [AWS](https://docs.databricks.com/en/large-language-models/ai-playground.html) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-playground)
+
 
 # COMMAND ----------
 
 # DBTITLE 1,Library Setup
 # MAGIC %pip install mlflow==2.11.1 langchain==0.1.13
-# COMMAND ----------
-
-dbutils.library.restartPython()
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 

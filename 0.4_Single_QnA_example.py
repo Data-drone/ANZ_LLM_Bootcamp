@@ -126,7 +126,7 @@ import pandas as pd
 experiment_name = 'workshop_rag_evaluations'
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
-mlflow_dir = f'/Users/{username}/experiment_name'
+mlflow_dir = f'/Users/{username}/{experiment_name}'
 mlflow.set_experiment(mlflow_dir)
 
 # COMMAND ----------
