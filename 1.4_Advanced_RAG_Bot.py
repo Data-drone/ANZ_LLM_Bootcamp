@@ -9,7 +9,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Extra Libs to install
-# MAGIC %pip install -U pymupdf typing_extensions sqlalchemy>=2.0.25 langchain==0.1.13 databricks-vectorsearch==0.23 flashrank mlflow==2.11.3
+# MAGIC %pip install -U pymupdf typing_extensions sqlalchemy>=2.0.25 langchain==0.1.16 databricks-vectorsearch==0.23 flashrank mlflow==2.12.2
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -54,9 +54,10 @@ from langchain.chains import create_history_aware_retriever
 
 chat_model = 'databricks-dbrx-instruct'
 embedding_model_name = 'databricks-bge-large-en'
+index_name = 'arxiv_data_bge_index'
 
 vsc = VectorSearchClient()
-vs_index_fullname = f'{db_catalog}.{db_schema}.arxiv_parse_bge_index'
+vs_index_fullname = f'{db_catalog}.{db_schema}.{index_name}'
 
 llm = ChatDatabricks(
     target_uri="databricks",
@@ -162,7 +163,7 @@ class AdvancedLangchainBot(mlflow.pyfunc.PythonModel):
         embedding_model_name = 'databricks-bge-large-en'
 
         vsc = VectorSearchClient()
-        vs_index_fullname = f'{db_catalog}.{db_schema}.arxiv_parse_bge_index'
+        vs_index_fullname = f'{db_catalog}.{db_schema}.{index_name}'
 
         llm = ChatDatabricks(
             target_uri="databricks",
@@ -277,6 +278,22 @@ sample_questions
 
 # COMMAND ----------
 
+def eval_pipe(inputs):
+    print(inputs)
+    answers = []
+    for index, row in inputs.iterrows():
+        #answer = {'answer': 'test'}
+        #print(row)
+        dict_obj = {"chat_history": row['input'], 
+                    "input": row['chat_history']}
+        answer = chain.invoke(dict_obj)
+        
+        answers.append(answer) #['answer'])
+    
+    return answers
+
+# COMMAND ----------
+
 experiment_name = 'workshop_rag_evaluations'
 
 username = spark.sql("SELECT current_user()").first()['current_user()']
@@ -304,9 +321,9 @@ with mlflow.start_run(run_name='advanced_rag'):
 
     mlflow_result = mlflow.pyfunc.log_model(
         python_model = model,
-        extra_pip_requirements = ['langchain==0.1.13', 
+        extra_pip_requirements = ['langchain==0.1.16', 
                                 'sqlalchemy==2.0.29', 
-                                'mlflow==2.11.3', 
+                                'mlflow==2.12.2', 
                                 'databricks-vectorsearch==0.23', 
                                 'flashrank==0.2.0'],
         artifact_path = 'langchain_pyfunc',
@@ -317,7 +334,7 @@ with mlflow.start_run(run_name='advanced_rag'):
 
     # TODO Fix the evals potentially by just using the chain from above?
     eval_results = mlflow.evaluate(eval_pipe, 
-                          data=sample_questions[0:30], 
+                          data=sample_questions, 
                           model_type='text')
 
 # COMMAND ----------
