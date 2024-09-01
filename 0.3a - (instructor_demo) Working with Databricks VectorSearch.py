@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch langchain==0.1.13 sqlalchemy==2.0.27 pypdf==4.1.0
+# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch langchain==0.2.15 langchain-community==0.2.14 sqlalchemy==2.0.27 pypdf==4.1.0
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -24,7 +24,7 @@
 # file_uri = 'https://arxiv.org/pdf/2203.02155.pdf'
 volume_path = f'/Volumes/{db_catalog}/{db_schema}/{db_volume}/'
 file_path = f"{volume_path}2203.02155.pdf"
-embedding_endpoint = 'databricks-bge-large-en'
+embedding_endpoint = 'databricks-gte-large-en'
 # urllib.request.urlretrieve(file_uri, file_path)
 
 # COMMAND ----------
@@ -100,7 +100,7 @@ vsc.get_endpoint(
   name=vector_search_endpoint
 )
 
-vs_index = f"{raw_table}_bge_index"
+vs_index = f"{raw_table}_vs_index"
 vs_index_fullname = f"{db_catalog}.{db_schema}.{vs_index}"
 
 # COMMAND ----------
@@ -138,13 +138,25 @@ index.describe()
 
 # COMMAND ----------
 
+# DBTITLE 1,Regular Vector Search
 results = index.similarity_search(
-  columns=["page_content"],
+  columns=["row_id", "page_content"],
   # vs_index_fullname,
   query_text="Tell me about tuning LLMs",
   num_results=3
   )
 
+results
+
 # COMMAND ----------
+
+# DBTITLE 1,Hybrid Search
+results = index.similarity_search(
+  columns=["row_id", "page_content"],
+  # vs_index_fullname,
+  query_text="Tell me about tuning LLMs",
+  num_results=3,
+  query_type="hybrid"
+  )
 
 results

@@ -85,6 +85,7 @@ dload_path.mkdir(parents=True, exist_ok=True)
 
 os.environ['HF_HOME'] = hf_volume_path
 os.environ['TRANSFORMERS_CACHE'] = transformers_cache
+os.environ['HF_TOKEN'] = dbutils.secrets.get(scope="brian_hf", key="hf_hub_token")
 
 from huggingface_hub import hf_hub_download, list_repo_files
 
@@ -97,8 +98,7 @@ for lib_name in repo_list.keys():
             hf_hub_download(
                 repo_list[lib_name],
                 filename=name,
-                local_dir=os.path.join(downloads_dir, lib_name),
-                local_dir_use_symlinks=False
+                local_dir=os.path.join(downloads_dir, lib_name)
             )
 
 # COMMAND ----------
