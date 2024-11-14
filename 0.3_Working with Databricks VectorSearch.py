@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch langchain==0.2.15 langchain-community==0.2.14 sqlalchemy==2.0.27 pypdf==4.1.0
+# MAGIC %pip install -U databricks-vectorsearch langchain==0.3.7 langchain-community==0.3.7 pymupdf4llm mlflow==2.17.2
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -35,7 +35,7 @@ embedding_endpoint = 'databricks-gte-large-en'
 # COMMAND ----------
 
 # 1) Chunk the documents
-from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader, Docx2txtLoader, TextLoader
+from langchain_community.document_loaders import WebBaseLoader, PyMuPDFLoader, Docx2txtLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter 
 import os
 
@@ -44,7 +44,7 @@ def chunk_pdf_from_dir(directory:str='./docs'):
     documents = []
     for file in os.listdir(directory):
         pdf_path = os.path.join(directory, file)
-        loader = PyPDFLoader(pdf_path)
+        loader = PyMuPDFLoader(pdf_path)
         documents.extend(loader.load())
     
     text_splitter = RecursiveCharacterTextSplitter()

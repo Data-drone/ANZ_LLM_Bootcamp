@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U -qqqq databricks-agents mlflow mlflow-skinny==2.15.1 databricks-vectorsearch langchain==0.2.11 langchain_core==0.2.23 langchain_community==0.2.10 
+# MAGIC %pip install -U -qqqq databricks-agents mlflow mlflow-skinny==2.17.2 databricks-vectorsearch langchain==0.3.7 langchain-community==0.3.7 
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -23,6 +23,8 @@ w = WorkspaceClient()
 with mlflow.start_run(run_name='brian_test_run'):
     # Tag to differentiate from the data pipeline runs
     mlflow.set_tag("type", "chain")
+
+    # TODO eval loop
 
     logged_chain_info = mlflow.langchain.log_model(
         lc_model=os.path.join(

@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U langchain==0.2.11 langchain_core==0.2.23 langchain_community==0.2.10 sqlalchemy==2.0.27 pypdf==4.3.0 mlflow-skinny==2.15.1 databricks-vectorsearch 
+# MAGIC %pip install -U langchain==0.3.7 langchain-community==0.3.7 mlflow-skinny==2.17.2 databricks-vectorsearch databricks-langchain
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -40,7 +40,6 @@ chat_model = "databricks-meta-llama-3-1-70b-instruct"
 # COMMAND ----------
 
 from operator import itemgetter
-import mlflow
 
 # Construct and Test LLM Chain
 from langchain_core.messages import HumanMessage, AIMessage
@@ -49,9 +48,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, Prom
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough, RunnableBranch
 
 from databricks.vector_search.client import VectorSearchClient
-from langchain_community.vectorstores import DatabricksVectorSearch
-from langchain_community.chat_models import ChatDatabricks
-from langchain_community.embeddings import DatabricksEmbeddings
+from databricks_langchain import DatabricksVectorSearch
+from databricks_langchain import ChatDatabricks
+from databricks_langchain import DatabricksEmbeddings
 
 mlflow.langchain.autolog()
 

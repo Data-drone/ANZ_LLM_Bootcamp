@@ -7,7 +7,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install llama_index==0.10.25 langchain==0.1.13 llama-index-llms-langchain llama-index-embeddings-langchain
+# MAGIC %pip install databricks-langchain llama_index==0.11.23 langchain==0.3.7 langchain-community==0.3.7 llama-index-llms-langchain llama-index-embeddings-langchain swifter databricks-agents
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -43,14 +43,14 @@ nest_asyncio.apply()
 
 # COMMAND ----------
 
-from langchain_community.chat_models import ChatDatabricks
-from langchain_community.embeddings import DatabricksEmbeddings
+from databricks_langchain import ChatDatabricks
+from databricks_langchain import DatabricksEmbeddings
 from llama_index.core import Settings
 from llama_index.llms.langchain import LangChainLLM
 from llama_index.embeddings.langchain import LangchainEmbedding
 
-embedding_model = 'databricks-bge-large-en'
-model_name = 'databricks-dbrx-instruct'
+embedding_model = 'databricks-gte-large-en'
+model_name = 'databricks-meta-llama-3-1-405b-instruct'
 
 llm_model = model = ChatDatabricks(
   target_uri='databricks',
@@ -116,7 +116,7 @@ data_generator = DatasetGenerator.from_documents(documents)
 
 # this is the call to generate the questions
 # if you set the number it will run multithreaded and be gaster
-eval_questions = data_generator.generate_questions_from_nodes(num=64)
+eval_questions = data_generator.generate_questions_from_nodes(num=32)
 eval_questions
 
 # Some of these questions might not be too useful. It could be because of the model we are using for generation
@@ -124,68 +124,41 @@ eval_questions
 
 # COMMAND ----------
 
+# Lets generate the answer to the questions
 # When running in lab env we may pregenerate ahead of the class and store it for reloading
 #question_frame = spark.sql(f"SELECT * FROM {db_catalog}.{db_schema}.evaluation_questions").toPandas()
-question_frame = pd.DataFrame(eval_questions, columns=["eval_questions"])
-dataframe = spark.createDataFrame(question_frame)
+question_frame = pd.DataFrame(eval_questions, columns=["request"])
+
+#query_engine.query('Hihihihi').source_nodes[0].text
+question_frame['query_result'] = question_frame['request'].apply(lambda x: query_engine.query(x))
+
+question_frame['expected_response'] = question_frame['query_result'].apply(lambda x: x.response)
+
+question_frame['retrieved_context'] = question_frame['query_result'].apply(
+  lambda x: [{'doc_uri': f"{x.metadata['file_path']} -  page {x.metadata['page_label']}",
+  "content": x.text} for x in question_frame['query_result'][0].source_nodes]
+)
+
+response_frame = question_frame.drop(columns=['query_result'], axis=1)
+
+dataframe = spark.createDataFrame(response_frame)
 
 dataframe.write.mode("overwrite").saveAsTable(f"{db_catalog}.{db_schema}.evaluation_questions")
 display(dataframe)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Use Questions to generate evaluations
-# MAGIC Now we have our queries we need to run some responses
+# MAGIC # Run Databricks AI Evaluations
 # MAGIC
-# MAGIC This next step can be slow so we will cut it down to 20 questions \
-# MAGIC We can then use the `ResponseEvaluator`` looks at whether the query is answered by the response
-
+# MAGIC Lets see how to run these evaluations
 # COMMAND ----------
 
-import pandas as pd
-from llama_index.core.evaluation import RelevancyEvaluator
-from llama_index.core.evaluation import EvaluationResult
+import mlflow
 
-eval_questions = eval_questions[0:20]
 
-# Yes we are using a LLM to evaluate a LLM
-## When doing this normally you might use a more powerful but more expensive evaluator
-## to assess the quality of your input
-evaluator = RelevancyEvaluator(llm=llama_index_chain)
-
-# define jupyter display function
-def display_eval_df(
-    query: str, response: Response, eval_result: EvaluationResult
-) -> None:
-    eval_df = pd.DataFrame(
-        {
-            "Query": query,
-            "Response": str(response),
-            "Source": response.source_nodes[0].node.text[:1000] + "...",
-            "Evaluation Result": "Pass" if eval_result.passing else "Fail",
-            "Reasoning": eval_result.feedback,
-        },
-        index=[0],
+with mlflow.start_run():
+    
+    mlflow.evaluate(
+        data=response_frame, # Evaluation set 
+        model_type="databricks-agent", # Use Agent Evaluation
     )
-    eval_df = eval_df.style.set_properties(
-        **{
-            "inline-size": "600px",
-            "overflow-wrap": "break-word",
-        },
-        subset=["Response", "Source"]
-    )
-    display(eval_df)
-# COMMAND ----------
-
-query_str = (
-    "What is the best approach to finetuning llms?"
-)
-query_engine = index.as_query_engine()
-response_vector = query_engine.query(query_str)
-eval_result = evaluator.evaluate_response(
-    query=query_str, response=response_vector
-)
-
-# COMMAND ----------
-
-display_eval_df(query_str, response_vector, eval_result)
