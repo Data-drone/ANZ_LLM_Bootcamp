@@ -78,7 +78,7 @@ from pathlib import Path
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
 
-db_catalog = spark.getConf().get("da.workshop_catalog") #'brian_ml_dev' 
+db_catalog = spark.conf.get("da.workshop_catalog") #'brian_ml_dev' 
 db_schema = 'genai_workshop'
 db_volume = 'raw_data'
 raw_table = 'arxiv_data'
@@ -89,6 +89,7 @@ vector_search_endpoint = 'vector-search-endpoint'
 #vector_search_endpoint = 'gen_ai_workshop'
 
 # # setting up transformers cache
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {db_catalog}.{db_schema}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{hf_volume}")
 hf_volume_path = f'/Volumes/{db_catalog}/{db_schema}/{hf_volume}'
 
