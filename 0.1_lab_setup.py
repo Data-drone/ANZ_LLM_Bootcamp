@@ -71,6 +71,9 @@ for pdf in pdfs.keys():
 # COMMAND ----------
 
 # DBTITLE 1,To Examine Embeddings we need to download from huggingface
+
+# In earlier iterations we loaded the hf model to use but we don't need to anymore
+## Note this is a gated model and requires a token to access
 from pathlib import Path
 
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{hf_volume}")
@@ -84,22 +87,22 @@ tf_cache_path.mkdir(parents=True, exist_ok=True)
 dload_path.mkdir(parents=True, exist_ok=True)
 
 os.environ['HF_HOME'] = hf_volume_path
-os.environ['TRANSFORMERS_CACHE'] = transformers_cache
-os.environ['HF_TOKEN'] = dbutils.secrets.get(scope="brian_hf", key="hf_hub_token")
+#os.environ['TRANSFORMERS_CACHE'] = transformers_cache
+#os.environ['HF_TOKEN'] = dbutils.secrets.get(scope="brian_hf", key="hf_hub_token")
 
-from huggingface_hub import hf_hub_download, list_repo_files
+# from huggingface_hub import hf_hub_download, list_repo_files
 
-repo_list = {'mistral_7b_instruct': 'mistralai/Mistral-7B-v0.1'}
+# repo_list = {'mistral_7b_instruct': 'mistralai/Mistral-7B-v0.1'}
 
-for lib_name in repo_list.keys():
-    for name in list_repo_files(repo_list[lib_name]):
-        target_path = os.path.join(downloads_dir, lib_name, name)
-        if not os.path.exists(target_path):
-            hf_hub_download(
-                repo_list[lib_name],
-                filename=name,
-                local_dir=os.path.join(downloads_dir, lib_name)
-            )
+# for lib_name in repo_list.keys():
+#     for name in list_repo_files(repo_list[lib_name]):
+#         target_path = os.path.join(downloads_dir, lib_name, name)
+#         if not os.path.exists(target_path):
+#             hf_hub_download(
+#                 repo_list[lib_name],
+#                 filename=name,
+#                 local_dir=os.path.join(downloads_dir, lib_name)
+#             )
 
 # COMMAND ----------
             

@@ -24,21 +24,19 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pymupdf llama_index==0.10.25 langchain==0.1.13 llama-index-llms-langchain poppler-utils unstructured[pdf,txt]==0.13.0 databricks-vectorsearch==0.23 llama-index-embeddings-langchain
+# MAGIC %pip install pymupdf4llm databricks-langchain llama_index==0.11.23 langchain==0.3.7 langchain-community==0.3.7 llama-index-llms-langchain llama-index-embeddings-langchain poppler-utils unstructured[pdf,txt]==0.16.5 databricks-vectorsearch llama-index-embeddings-langchain
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 # DBTITLE 1,Setup
 
-%run ./utils
+# MAGIC %run ./utils
 
 # COMMAND ----------
 
 # DBTITLE 1,Config
 import os
-from langchain_community.chat_models import ChatDatabricks
 from langchain.document_loaders import PyMuPDFLoader
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 sample_file_to_load = f'/Volumes/{db_catalog}/{db_schema}/{db_volume}/2302.06476.pdf'
 print(f'We will use {sample_file_to_load} to review chunking open it alongside to see how different algorithms work')
@@ -205,16 +203,17 @@ display(*[(type(element), element.text) for element in elements[400:410]])
 # COMMAND ----------
 
 # DBTITLE 1,Setting Up Llama_index default models
-from langchain_community.chat_models import ChatDatabricks
-from langchain_community.embeddings import DatabricksEmbeddings
+from databricks_langchain import ChatDatabricks
+from databricks_langchain import DatabricksEmbeddings
 from llama_index.core import Settings
 from llama_index.llms.langchain import LangChainLLM
 from llama_index.embeddings.langchain import LangchainEmbedding
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import nltk
 
 nltk.download('averaged_perceptron_tagger')
-model_name = 'databricks-dbrx-instruct'
-embedding_model = 'databricks-bge-large-en'
+model_name = 'databricks-meta-llama-3-1-70b-instruct'
+embedding_model = 'databricks-gte-large-en'
 
 llm_model = ChatDatabricks(
   target_uri='databricks',

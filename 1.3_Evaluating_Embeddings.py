@@ -10,7 +10,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pymupdf faiss-cpu datashader bokeh holoviews scikit-image colorcet llama_index==0.10.25 langchain==0.1.13 llama-index-llms-langchain poppler-utils unstructured[pdf,txt]==0.13.0 databricks-vectorsearch==0.23 llama-index-embeddings-langchain
+# MAGIC %pip install databricks_langchain pymupdf4llm faiss-cpu datashader bokeh holoviews scikit-image colorcet llama_index==0.11.23 langchain==0.3.7 langchain-community==0.3.7 llama-index-llms-langchain poppler-utils unstructured[pdf,txt]==0.13.0 databricks-vectorsearch llama-index-embeddings-langchain
 # MAGIC dbutils.library.restartPython()
 # COMMAND ----------
 
@@ -23,8 +23,8 @@ import os
 import numpy as np
 
 # Setup Models & Embeddings
-from langchain_community.chat_models import ChatDatabricks
-from langchain_community.embeddings import DatabricksEmbeddings
+from databricks_langchain import ChatDatabricks
+from databricks_langchain import DatabricksEmbeddings
 from llama_index.core import Settings
 from llama_index.llms.langchain import LangChainLLM
 from llama_index.embeddings.langchain import LangchainEmbedding
