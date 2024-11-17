@@ -21,7 +21,7 @@ import requests
 # COMMAND ----------
 
 # Setup Catalogs and directories
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {db_catalog}")
+#spark.sql(f"CREATE CATALOG IF NOT EXISTS {db_catalog}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {db_catalog}.{db_schema}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {db_catalog}.{db_schema}.{db_volume}")
 volume_folder = f"/Volumes/{db_catalog}/{db_schema}/{db_volume}/"
