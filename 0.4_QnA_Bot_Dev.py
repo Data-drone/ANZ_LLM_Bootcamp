@@ -84,7 +84,7 @@ index = vsc.get_index(endpoint_name=vector_search_endpoint,
                       index_name=vs_index_fullname)
 
 retriever = DatabricksVectorSearch(
-    index, text_column="page_content", 
+    vs_index_fullname, text_column="page_content", 
     embedding=embeddings, columns=["row_id", "source_doc"]
 ).as_retriever()
 
