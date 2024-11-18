@@ -85,7 +85,7 @@ index = vsc.get_index(endpoint_name=vector_search_endpoint,
 
 retriever = DatabricksVectorSearch(
     vs_index_fullname, text_column="page_content", 
-    embedding=embeddings, columns=["row_id", "source_doc"]
+    columns=["row_id", "source_doc"]
 ).as_retriever()
 
 mlflow.models.set_retriever_schema(
