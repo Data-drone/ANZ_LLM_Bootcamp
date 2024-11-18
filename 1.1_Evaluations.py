@@ -116,7 +116,7 @@ data_generator = DatasetGenerator.from_documents(documents)
 
 # this is the call to generate the questions
 # if you set the number it will run multithreaded and be gaster
-eval_questions = data_generator.generate_questions_from_nodes(num=32)
+eval_questions = data_generator.generate_questions_from_nodes(num=16)
 eval_questions
 
 # Some of these questions might not be too useful. It could be because of the model we are using for generation
