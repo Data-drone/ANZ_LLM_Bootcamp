@@ -31,7 +31,7 @@ from llama_index.embeddings.langchain import LangchainEmbedding
 import nltk
 
 nltk.download('averaged_perceptron_tagger')
-model_name = 'databricks-dbrx-instruct'
+model_name = 'databricks-meta-llama-3-3-70b-instruct'
 embedding_model = 'databricks-bge-large-en'
 
 llm_model = ChatDatabricks(

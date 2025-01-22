@@ -24,7 +24,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pymupdf4llm databricks-langchain llama_index==0.11.23 langchain==0.3.7 langchain-community==0.3.7 llama-index-llms-langchain llama-index-embeddings-langchain poppler-utils unstructured[pdf,txt]==0.16.5 databricks-vectorsearch llama-index-embeddings-langchain
+# MAGIC %pip install pymupdf4llm databricks-langchain lama_index==0.12.12 langchain==0.3.14 langchain-community==0.3.14 llama-index-llms-langchain llama-index-embeddings-langchain poppler-utils unstructured[pdf,txt]==0.16.5 databricks-vectorsearch llama-index-embeddings-langchain
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -212,7 +212,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import nltk
 
 nltk.download('averaged_perceptron_tagger')
-model_name = 'databricks-meta-llama-3-1-70b-instruct'
+model_name = 'databricks-meta-llama-3-3-70b-instruct'
 embedding_model = 'databricks-gte-large-en'
 
 llm_model = ChatDatabricks(
