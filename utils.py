@@ -65,7 +65,7 @@ def get_cfn():
                 Catalog:                    {workshop_catalog} 
                 """)
 
-get_cfn()
+#get_cfn()
 
 
 # COMMAND ----------
@@ -78,7 +78,8 @@ from pathlib import Path
 username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
 
-db_catalog = spark.conf.get("da.workshop_catalog") #'brian_ml_dev' 
+# spark.conf.get("da.workshop_catalog")
+db_catalog = 'brian_ml_dev' 
 db_schema = 'genai_workshop'
 db_volume = 'raw_data'
 raw_table = 'arxiv_data'
@@ -97,8 +98,8 @@ transformers_cache = f'{hf_volume_path}/transformers'
 downloads_dir = f'{hf_volume_path}/downloads'
 tf_cache_path = Path(transformers_cache)
 dload_path = Path(downloads_dir)
-tf_cache_path.mkdir(parents=True, exist_ok=True)
-dload_path.mkdir(parents=True, exist_ok=True)
+#tf_cache_path.mkdir(parents=True, exist_ok=True)
+#dload_path.mkdir(parents=True, exist_ok=True)
 
 # COMMAND ----------
 

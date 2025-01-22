@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U databricks-vectorsearch langchain==0.3.7 langchain-community==0.3.7 pymupdf4llm mlflow==2.17.2
+# MAGIC %pip install -U databricks-vectorsearch langchain==0.3.14 langchain-community==0.3.14 pymupdf4llm mlflow==2.19.0
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------

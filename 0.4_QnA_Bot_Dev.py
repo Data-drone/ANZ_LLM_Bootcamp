@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U langchain==0.3.7 langchain-community==0.3.7 mlflow-skinny==2.17.2 databricks-vectorsearch databricks-langchain
+# MAGIC %pip install -U langchain==0.3.14 langchain-community==0.3.14 mlflow-skinny==2.19.0 databricks-vectorsearch databricks-langchain
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -35,7 +35,7 @@ vs_index_fullname = f"{db_catalog}.{db_schema}.{vs_index}"
 
 # temp need to change later
 embedding_model = "databricks-gte-large-en"
-chat_model = "databricks-meta-llama-3-1-70b-instruct"
+chat_model = "databricks-meta-llama-3-3-70b-instruct"
 
 # COMMAND ----------
 
