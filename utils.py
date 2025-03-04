@@ -79,7 +79,7 @@ username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
 
 # spark.conf.get("da.workshop_catalog")
-db_catalog = 'brian_ml_dev' 
+db_catalog = 'workshop_ml_dev' 
 db_schema = 'genai_workshop'
 db_volume = 'raw_data'
 raw_table = 'arxiv_data'

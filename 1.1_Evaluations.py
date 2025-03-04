@@ -7,7 +7,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install databricks-agents databricks-langchain mlflow==2.19.0 llama_index==0.12.12 langchain==0.3.14 langchain-community==0.3.14 llama-index-llms-langchain llama-index-embeddings-langchain swifter databricks-agents
+# MAGIC %pip install databricks-agents databricks-langchain mlflow==2.19.0 langchain==0.3.14 langchain-community==0.3.14 swifter databricks-agents
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
