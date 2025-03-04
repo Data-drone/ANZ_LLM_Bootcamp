@@ -79,11 +79,12 @@ username = spark.sql("SELECT current_user()").first()['current_user()']
 os.environ['USERNAME'] = username
 
 # spark.conf.get("da.workshop_catalog")
-db_catalog = 'workshop_ml_dev' 
+db_catalog = 'splunk_databricks' 
 db_schema = 'genai_workshop'
 db_volume = 'raw_data'
 raw_table = 'arxiv_data'
 hf_volume = 'hf_volume'
+vs_index = f"{raw_table}_vs_index"
 
 #Internal dev
 vector_search_endpoint = 'vector-search-endpoint'

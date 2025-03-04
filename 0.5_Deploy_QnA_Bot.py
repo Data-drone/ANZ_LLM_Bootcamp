@@ -20,6 +20,12 @@ w = WorkspaceClient()
 
 # COMMAND ----------
 
+from mlflow.models.resources import (
+    DatabricksServingEndpoint,
+    DatabricksVectorSearchIndex,
+    DatabricksGenieSpace
+)
+
 with mlflow.start_run(run_name='brian_test_run'):
     # Tag to differentiate from the data pipeline runs
     mlflow.set_tag("type", "chain")
@@ -40,7 +46,9 @@ with mlflow.start_run(run_name='brian_test_run'):
             },
             ]
         },  # Save the chain's input schema.  MLflow will execute the chain before logging & capture it's output schema.
-        example_no_conversion=True,  # Required by MLflow to use the input_example as the chain's schema
+        resource=[
+            DatabricksVectorSearchIndex(index_name=f"{db_catalog}.{db_schema}.{vs_index}")
+        ],
         extra_pip_requirements=["databricks-agents"] # TODO: Remove this
     )
 
