@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U databricks-vectorsearch langchain==0.3.14 langchain-community==0.3.14 pymupdf4llm mlflow==2.19.0
+# MAGIC %pip install -U databricks-vectorsearch langchain==0.3.21 langchain-community==0.3.20 pymupdf4llm mlflow==2.21.1
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -110,15 +110,23 @@ vsc.list_indexes(name=vector_search_endpoint)
 
 # COMMAND ----------
 
-index = vsc.create_delta_sync_index(
-  endpoint_name=vector_search_endpoint,
-  source_table_name=f'{db_catalog}.{db_schema}.{raw_table}',
-  index_name=vs_index_fullname,
-  pipeline_type='TRIGGERED',
-  primary_key="row_id",
-  embedding_source_column="page_content",
-  embedding_model_endpoint_name=embedding_endpoint
-)
+existing_indices = vsc.list_indexes(name=vector_search_endpoint)
+exists = any(entry['name'] == vs_index_fullname for entry in existing_indices['vector_indexes'])
+
+if exists:
+  index = vsc.get_index(endpoint_name=vector_search_endpoint, 
+                        index_name=vs_index_fullname)
+else:
+  index = vsc.create_delta_sync_index(
+    endpoint_name=vector_search_endpoint,
+    source_table_name=f'{db_catalog}.{db_schema}.{raw_table}',
+    index_name=vs_index_fullname,
+    pipeline_type='TRIGGERED',
+    primary_key="row_id",
+    embedding_source_column="page_content",
+    embedding_model_endpoint_name=embedding_endpoint
+  )
+  
 index.describe()['status']['message']
 
 # COMMAND ----------

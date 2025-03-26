@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U langchain==0.3.14 langchain-community==0.3.14 mlflow-skinny==2.19.0 databricks-vectorsearch databricks-langchain
+# MAGIC %pip install -U langchain==0.3.21 langchain-community==0.3.14 mlflow-skinny==2.21.1 databricks-vectorsearch databricks-langchain
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------

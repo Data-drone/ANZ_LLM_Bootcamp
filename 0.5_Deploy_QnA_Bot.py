@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install -U -qqqq databricks-agents databricks-langchain mlflow==2.19.0 databricks-vectorsearch langchain==0.3.14 langchain-community==0.3.14 
+# MAGIC %pip install -U -qqqq databricks-agents databricks-langchain mlflow==2.21.1 databricks-vectorsearch langchain==0.3.21 langchain-community==0.3.20 
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -30,8 +30,6 @@ with mlflow.start_run(run_name='brian_test_run'):
     # Tag to differentiate from the data pipeline runs
     mlflow.set_tag("type", "chain")
 
-    # TODO eval loop
-
     logged_chain_info = mlflow.langchain.log_model(
         lc_model=os.path.join(
             os.getcwd(), '0.4_QnA_Bot_Dev'
@@ -46,10 +44,11 @@ with mlflow.start_run(run_name='brian_test_run'):
             },
             ]
         },  # Save the chain's input schema.  MLflow will execute the chain before logging & capture it's output schema.
-        resource=[
+        resources=[
+            DatabricksServingEndpoint(endpoint_name='databricks-meta-llama-3-3-70b-instruct'),
             DatabricksVectorSearchIndex(index_name=f"{db_catalog}.{db_schema}.{vs_index}")
         ],
-        extra_pip_requirements=["databricks-agents"] # TODO: Remove this
+        #extra_pip_requirements=["databricks-agents"] # TODO: Remove this
     )
 
     # Attach the data pipeline's configuration as parameters
